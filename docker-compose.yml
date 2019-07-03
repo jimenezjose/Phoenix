@@ -1,0 +1,7 @@
+version: '3.4'
+  
+services:
+  lab-tester:
+    build: .
+    ports:
+      - "5000:80"
