@@ -25,10 +25,10 @@ def create_app(test_config=None):
 
         # a simple page that says hello
         @app.route('/')
-        def hello():
-                return 'Phoenix Time'
+        def index():
+	        return 'Phoenix Time'
 
-	from route import api_bp
-	app.register_blueprint(api_bp, url_prefix='/api')
+        from . import route
+        app.register_blueprint(route.api_bp, url_prefix='/api')
 
         return app
