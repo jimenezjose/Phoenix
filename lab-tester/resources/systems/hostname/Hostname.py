@@ -1,5 +1,6 @@
 from flask_restful import Resource
-# local resour
+# local resources
+from .test import Test
 
 def add_all_resources(api, path):
 	api.add_resource(Hostname, path)
@@ -16,5 +17,4 @@ class Hostname(Resource):
 
 	def add_all_resources(api, path):
 		# recursively add sub-packaged resources
-		return
-
+		Test.add_all_resources(api, path)
