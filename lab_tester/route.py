@@ -13,6 +13,3 @@ api = Api(api_bp)
 Systems.add_all_resources(api, '/systems')
 Tests.add_all_resources(api, '/tests')
 Testruns.add_all_resources(api, '/testruns')
-
-
-

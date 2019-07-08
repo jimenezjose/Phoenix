@@ -1,4 +1,6 @@
 from flask_restful import Resource
+#local resources
+from .hostname import Hostname
 
 def add_all_resources(api, path):
         api.add_resource(Systems, path)
@@ -14,4 +16,4 @@ class Systems(Resource):
 		return {"message": "POST hostname=sfo2-aag-12-sr1, adds new unretired system=sfo2-aag-12-sr1"}
 
 	def add_all_resources(api, path):
-		return
+		Hostname.add_all_resources(api, path + '/<string:hostname>')

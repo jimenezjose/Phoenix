@@ -1,4 +1,6 @@
 from flask_restful import Resource
+# local resources
+from .details import Details
 
 def add_all_resources(api, path):
         api.add_resource(Tests, path)
@@ -11,5 +13,6 @@ class Tests(Resource):
 		return {"message": "Get all tests (id, name)"}
 
 	def add_all_resources(api, path):
-                return
+		# recursively add sub-packaged resources
+		Details.add_all_resources(api, path + '/details')
 
