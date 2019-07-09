@@ -5,6 +5,7 @@ def add_all_resources(api, path):
 	#recursively add all sub-resources
 	Test.add_all_resources(api, path)
 
+''' systems/<string:hostname>/test '''
 class Test(Resource):
 	def get(self, hostname):
 		return {"message" : "Get most recent testrun id of " + hostname}

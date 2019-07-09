@@ -17,4 +17,4 @@ class Hostname(Resource):
 
 	def add_all_resources(api, path):
 		# recursively add sub-packaged resources
-		Test.add_all_resources(api, path)
+		Test.add_all_resources(api, path + '/test')

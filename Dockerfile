@@ -2,7 +2,7 @@ FROM python:3.7-alpine
   
 WORKDIR /usr/src/app
 
-ENV FLASK_APP lab-tester
+ENV FLASK_APP lab-tester-api
 ENV FLASK_RUN_HOST 0.0.0.0
 ENV FLASK_RUN_PORT 80
 ENV FLASK_ENV development

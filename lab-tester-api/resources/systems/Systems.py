@@ -1,4 +1,4 @@
-from flask_restful import Resource
+from flask_restful import Resource, reqparse
 #local resources
 from .hostname import Hostname
 
@@ -13,7 +13,10 @@ class Systems(Resource):
 		return {"message": "GET all unretured systems"}
 
 	def post(self):
-		return {"message": "POST hostname=sfo2-aag-12-sr1, adds new unretired system=sfo2-aag-12-sr1"}
+		parser = reqparse.RequestParser()
+		parser.add_argument('name', required=True, help="Name cannot be blank!") 
+		args = parser.parse_args()
+		return {"message" : "args: " + str(args)}
 
 	def add_all_resources(api, path):
 		Hostname.add_all_resources(api, path + '/<string:hostname>')
