@@ -14,7 +14,7 @@ class Systems(Resource):
 
 	def post(self):
 		parser = reqparse.RequestParser()
-		parser.add_argument('name', required=True, help="Name cannot be blank!") 
+		parser.add_argument('name', required=True) 
 		args = parser.parse_args()
 		return {"message" : "args: " + str(args)}
 
