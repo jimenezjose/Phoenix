@@ -1,7 +1,7 @@
 version: '3.4'
   
 services:
-  lab-tester-api:
+  api:
     build: .
     volumes:
       - .:/usr/src/app
