@@ -1,12 +1,12 @@
 ## Project Phoenix
 
-# Install all dependencies
+### Install all dependencies
 _/_
 ```
 $ pip install -r requirements.txt
 ```
 
-# How to run
+### How to run
 _/_
 ```
 $ python run.py
