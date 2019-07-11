@@ -1,7 +1,7 @@
 ## Project Phoenix
 
 ### Install all dependencies
-_/_
+<sup>_/_</sup>
 ```
 $ pip install -r requirements.txt
 ```
