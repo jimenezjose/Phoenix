@@ -1,7 +1,15 @@
 ## Project Phoenix
 
+# Install all dependencies
+_/_
+```
+$ pip install -r requirements.txt
+```
+
 # How to run
+_/_
 ```
-$ docker-compose build
-$ docker-compose up
+$ python run.py
 ```
+
+[API](https://confluence.twitter.biz/pages/viewpage.action?pageId=107089361)

@@ -1,10 +1,10 @@
-from flask import Blueprint
-from flask_restful import Api
-
 # Resources
 from .resources.systems import Systems
 from .resources.tests import Tests
 from .resources.testruns import Testruns
+
+from flask import Blueprint
+from flask_restful import Api
 
 api_bp = Blueprint('api', __name__)
 api = Api(api_bp)
