@@ -7,7 +7,7 @@ $ pip install -r requirements.txt
 ```
 
 ### How to run
-_/_
+<sup>_/_</sup>
 ```
 $ python run.py
 ```
