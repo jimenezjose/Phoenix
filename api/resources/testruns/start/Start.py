@@ -10,6 +10,7 @@ class Start(Resource):
 	def post(self):
 		return {"message": "POST hostname=sfo2-aag-12-sr1, returns new testrun id"}
 
+	@staticmethod
 	def add_all_resources(api, path):
 		return
 

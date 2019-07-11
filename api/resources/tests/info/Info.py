@@ -10,6 +10,7 @@ class Info(Resource):
 	def get(self, id):
 		return {"message" : "Get test info about test id=" + str(id)}
 
+	@staticmethod
 	def add_all_resources(api, path):
 		# recursively add all sub-resources after id
 		return

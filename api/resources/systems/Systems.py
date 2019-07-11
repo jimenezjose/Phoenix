@@ -1,6 +1,6 @@
 from flask_restful import Resource, reqparse
 from api.db import get_db
-#local resources
+# local resources
 from .hostname import Hostname
 
 def add_all_resources(api, path):
@@ -11,21 +11,32 @@ def add_all_resources(api, path):
 ''' /systems '''
 class Systems(Resource):
 	def get(self):
-		return {"message": "GET all unretured systems"}
+		''' get all unretired hostnames '''
+		db = get_db()
+		cursor = db.cursor()
+		sql_query="SELECT hostname FROM hostnames WHERE retired = '0'"
+		cursor.execute(sql_query)
+		records = cursor.fetchall()
+		return {"list of unretired hostnames" : str(records)}
 
 	def post(self):
+		''' adds hostname to db '''
+		# require 'hostname' parameter from request
 		parser = reqparse.RequestParser()
-		parser.add_argument('first_name', required=True) 
-		parser.add_argument('last_name', required=True) 
-		parser.add_argument('age', type=int, required=True) 
+		parser.add_argument('hostname', required=True) 
 		args = parser.parse_args()
-		#db = get_db()
-		#cursor = db.cursor()
-		#sql = "INSERT INTO develop (first_name, last_name, age) VALUES (%s, %s, %s)"
-		#val = ("Virgilio", "Anaya", 17)
-		#cursor.execute(sql, val)
-		#db.commit()
-		return {"message" : "args: " + str(args['first_name'])}
 
+		# insert hostname into db
+		db = get_db()
+		cursor = db.cursor()
+		sql_insert="INSERT INTO hostnames (hostname) VALUES (%s);"
+		values=(args['hostname'],)
+		cursor.execute(sql_insert, values)
+		db.commit()
+
+		return {"inserted" : str(args['hostname'])}	
+
+
+	@staticmethod
 	def add_all_resources(api, path):
 		Hostname.add_all_resources(api, path + '/<string:hostname>')

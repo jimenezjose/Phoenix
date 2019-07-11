@@ -12,6 +12,7 @@ class Info(Resource):
 	def get(self, id):
 		return {"message": "Get info about testrun id=" + str(id)}
 
+	@staticmethod
 	def add_all_resources(api, path):
 		# recursively add all sub-packaged resources
 		Log.add_all_resources(api, path + '/log')

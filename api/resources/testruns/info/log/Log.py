@@ -10,5 +10,6 @@ class Log(Resource):
 	def post(self, id):
 		return {"message":"Upload log to testrun id=" + str(id)}
 
+	@staticmethod
 	def add_all_resources(api, path):
 		return

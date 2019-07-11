@@ -12,6 +12,7 @@ class Tests(Resource):
 	def get(self):
 		return {"message": "Get all tests (id, name)"}
 
+	@staticmethod
 	def add_all_resources(api, path):
 		# recursively add sub-packaged resources
 		Details.add_all_resources(api, path + '/details')

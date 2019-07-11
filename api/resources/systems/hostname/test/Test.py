@@ -10,6 +10,7 @@ class Test(Resource):
 	def get(self, hostname):
 		return {"message" : "Get most recent testrun id of " + hostname}
 
+	@staticmethod
 	def add_all_resources(api, path):
 		return
 

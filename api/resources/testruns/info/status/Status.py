@@ -10,6 +10,7 @@ class Status(Resource):
 	def put(self, id):
 		return {"message": "PUT status_id=" + str(id)}
 
+	@staticmethod
 	def add_all_resources(api, path):
 		return
 
