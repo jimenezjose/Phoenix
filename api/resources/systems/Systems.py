@@ -1,44 +1,66 @@
-# local resources
 from .hostname import Hostname
 
 from flask_restful import Resource, reqparse
 from api.db import get_db
 
 def add_all_resources(api, path):
+  """Recursively adds all sub-resources in the 'system' resource.
+
+  Args:
+      api:  flask_restful Api object.
+      path: string path for current resource. Example: 'api/systems'
+  """
   api.add_resource(Systems, path)
-  # recursively add all sub-resources
   Systems.add_all_resources(api, path)
 
-''' /systems '''
 class Systems(Resource):
+  """System resource with class design inhereted from flask_restful Resource."""
+
   def get(self):
-    ''' get all unretired hostnames '''
+    """GET request for all unretired systems."""
     db = get_db()
     cursor = db.cursor()
-    sql_query="SELECT hostname FROM hostnames WHERE retired = '0'"
+
+    # query for unretired hostnames
+    sql_query = 'SELECT hostname FROM hostnames WHERE retired = "0"'
     cursor.execute(sql_query)
     records = cursor.fetchall()
-    return {"list of unretired hostnames" : str(records)}
+
+    return {'message' : 'list of unretired hostnames: {}'.format(records)}, 200
 
   def post(self):
-    ''' adds hostname to db '''
-    # require 'hostname' parameter from request
+    """POST request to add a hostname to the database.
+    
+    Returns:
+        Success: (hostname inserted into the database)
+            Status Code: 201 Created
+
+        Failure: (required arguments not supplied in request) - implicit return by reqparse.
+            Status Code: 404 Not Found
+    """
+    db = get_db()
+    cursor = db.cursor()
     parser = reqparse.RequestParser()
+
+    # require 'hostname' parameter from request. 
     parser.add_argument('hostname', required=True) 
     args = parser.parse_args()
 
     # insert hostname into db
-    db = get_db()
-    cursor = db.cursor()
-    sql_insert="INSERT INTO hostnames (hostname) VALUES (%s)"
+    sql_insert = 'INSERT INTO hostnames (hostname) VALUES (%s)'
     values=(args['hostname'],)
     cursor.execute(sql_insert, values)
     db.commit()
 
-    return {"inserted" : str(args['hostname'])}
+    return {'message' : 'inserted: {}'.format(str(args['hostname']))}, 201
 
 
   @staticmethod
   def add_all_resources(api, path):
-    Hostname.add_all_resources(api, path + '/<string:hostname>')
+    """Directly adds all sub-resources of 'systems'.
 
+    Args:
+        api:  flask_restful Api object.
+        path: string path for current resource. Example: 'api/systems'
+    """  
+    Hostname.add_all_resources(api, '{}/<string:hostname>'.format(path))

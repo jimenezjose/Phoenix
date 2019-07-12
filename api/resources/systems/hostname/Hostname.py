@@ -1,46 +1,75 @@
-# local resources
 from .test import Test
 
 from flask_restful import Resource
 from api.db import get_db
 
 def add_all_resources(api, path):
+  """Recursively adds all sub-resources in the 'hostname' resource.
+
+  Args:
+      api:  flask_restful Api object.
+      path: string path for current resource. Example: 'api/systems/<string:hostname>'
+  """
   api.add_resource(Hostname, path)
-  # recursively add all sub-resources
   Hostname.add_all_resources(api, path)
 
-''' systems/<string:hostname> '''
 class Hostname(Resource):
+  """Hostname resource with class design inhereted from flask_restful Resource."""
+
   def get(self, hostname):
-    ''' Get info about unretired system '''
+    """Get information about hostname
+
+    Args:
+        hostname: string name of system hostname passed through url.
+    """
     db = get_db()
     cursor = db.cursor()
-    sql_query = "SELECT id FROM hostnames WHERE hostname = %s"
+
+    # query for hostname
+    sql_query = 'SELECT id FROM hostnames WHERE hostname = %s'
     values = (hostname,)
     cursor.execute(sql_query, values)
     records = cursor.fetchall()
-    return {"message" : "Get info about unretired system " + hostname + " with id: " + str(records[0])}
+
+    if not records:
+      # if no records exist for hostname, return 404 error.
+      return {'message' : 'Hostname: {} not found.'.format(hostname)}, 404
+
+    return {'message' : 'Info on: {} with id: {}'.format(hostname, records)}, 200
 
   def delete(self, hostname):
-    ''' update the state of the hostname to retired '''
-    # TODO might be an edge case: multiple hostnames with the same name with distinct ids.
-    # update hostname to retired in db
+    """Deletes the hostname by setting the retired flag to True.
+
+    Args:
+        hostname: string name of system hostname passed through url.
+    """
     db = get_db()
     cursor = db.cursor()
-    sql_update = "UPDATE hostnames SET retired = '1' WHERE hostname = %s"
+
+    # query for hostname
+    sql_query  = 'SELECT id FROM hostnames WHERE hostname = %s AND retired = "0"'
+    values = (hostname,)
+    cursor.execute(sql_query, values)
+    records = cursor.fetchall()
+
+    if not records:
+      # if no records exist for hostname, return 404 error.
+      return {'message' : 'Hostname: {} not found.'.format(hostname)}, 404
+
+    # update 
+    sql_update = 'UPDATE hostnames SET retired = "1" WHERE hostname = %s AND retired = "0"'
     values = (hostname,)
     cursor.execute(sql_update, values)
     db.commit()
 
-    # query all updated hostnames
-    sql_query  = "SELECT id FROM hostnames WHERE hostname = %s" 
-    values = (hostname,)
-    cursor.execute(sql_query, values)
-    records = cursor.fetchall()
-
-    return {"DELETE hostname" : hostname + " (set as retired with id: " + str(records) + ")"}
+    return {'message' : 'DELETE hostname: %s (set as retured with id: %d)' % (hostname, records)}, 200
 
   @staticmethod
   def add_all_resources(api, path):
-    # recursively add sub-packaged resources
-    Test.add_all_resources(api, path + '/test')
+    """Directly adds the necessary sub-resources.
+
+    Args:
+        api:  flask_restful Api object.
+        path: string path for current resource. Example: 'api/systems/<string:hostname>'
+    """ 
+    Test.add_all_resources(api, '{}/test'.format(path))
