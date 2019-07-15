@@ -14,7 +14,7 @@ def add_all_resources(api, path):
   Systems.add_all_resources(api, path)
 
 class Systems(Resource):
-  """System resource with class design inhereted from flask_restful Resource."""
+  """System resource with class design inherited from flask_restful Resource."""
 
   def get(self):
     """GET request for all unretired systems."""
@@ -32,11 +32,15 @@ class Systems(Resource):
     """POST request to add a hostname to the database.
     
     Returns:
-        Success: (hostname inserted into the database)
-            Status Code: 201 Created
+        Success: 
+            * (hostname inserted into the database)
+                Status Code: 201 Created
 
-        Failure: (required arguments not supplied in request) - implicit return by reqparse.
-            Status Code: 404 Not Found
+        Failure: 
+            * (required arguments not supplied in request) - implicit return by reqparse.
+                Status Code: 404 Not Found
+            * (duplicate insertion for unretired hostname not allowed) 
+                Status Code: 409 Conflict
     """
     db = get_db()
     cursor = db.cursor()
@@ -46,14 +50,23 @@ class Systems(Resource):
     parser.add_argument('hostname', required=True) 
     args = parser.parse_args()
 
-    # insert hostname into db
+    # check if working hostname already exists in db.
+    sql_query = 'SELECT hostname FROM hostnames WHERE retired = "0" AND hostname = %s'
+    values = (args['hostname'],)
+    cursor.execute(sql_query, values)
+    records = cursor.fetchall()
+
+    if records:
+      # unretired hostname already exists, returning conflict status code 409.
+      return {'message' : 'unretired hostname, {}, already exists'.format(args['hostname'])}, 409
+
+    # otherwise, insert hostname into db.
     sql_insert = 'INSERT INTO hostnames (hostname) VALUES (%s)'
-    values=(args['hostname'],)
+    values = (args['hostname'],)
     cursor.execute(sql_insert, values)
     db.commit()
 
     return {'message' : 'inserted: {}'.format(str(args['hostname']))}, 201
-
 
   @staticmethod
   def add_all_resources(api, path):

@@ -1,5 +1,6 @@
 instance/
 *.pyc
 __pycache__
-.pyo
+*.pyo
 *.swp
+test/

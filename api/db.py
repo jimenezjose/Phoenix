@@ -12,11 +12,11 @@ def get_db():
   """
   if 'db' not in g:
     g.db = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        passwd="Jose88",
-        database="TestPhoenix",
-        port=3306
+        host = 'localhost',
+        user = 'root',
+        passwd = 'Jose88',
+        database = 'TestPhoenix',
+        port = 3306
     )
   return g.db     
 

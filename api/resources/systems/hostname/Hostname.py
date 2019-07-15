@@ -56,7 +56,7 @@ class Hostname(Resource):
       # if no records exist for hostname, return 404 error.
       return {'message' : 'Hostname: {} not found.'.format(hostname)}, 404
 
-    # update 
+    # otherwise update hostname and set its retired flag to true
     sql_update = 'UPDATE hostnames SET retired = "1" WHERE hostname = %s AND retired = "0"'
     values = (hostname,)
     cursor.execute(sql_update, values)
