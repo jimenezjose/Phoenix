@@ -3,6 +3,8 @@ import click
 from flask import current_app, g
 from flask.cli import with_appcontext
 
+NULL_TIMESTAMP = '0000-00-00 00:00:00'
+
 def get_db():
   """Getter method to retrieve the current database connection.
     
