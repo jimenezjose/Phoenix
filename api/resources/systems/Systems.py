@@ -1,7 +1,7 @@
+from api.db import get_db
 from .hostname import Hostname
 
 from flask_restful import Resource, reqparse
-from api.db import get_db
 
 class Systems(Resource):
   """System resource with class design inherited from flask_restful Resource."""
@@ -58,16 +58,6 @@ class Systems(Resource):
 
     return {'message' : 'inserted: {}'.format(str(args['hostname']))}, 201
 
-  @staticmethod
-  def add_all_resources(api, path):
-    """Directly adds all sub-resources of 'systems'.
-
-    Args:
-        api:  flask_restful Api object.
-        path: string path for current resource. Example: 'api/systems'
-    """  
-    Hostname.add_all_resources(api, '{}/<string:hostname>'.format(path))
-
 def add_all_resources(api, path):
   """Recursively adds all sub-resources in the 'system' resource.
 
@@ -75,5 +65,7 @@ def add_all_resources(api, path):
       api:  flask_restful Api object.
       path: string path for current resource. Example: 'api/systems'
   """
+  # register systems as an api resource
   api.add_resource(Systems, path)
-  Systems.add_all_resources(api, path)
+  # directly add sub-resources of system
+  Hostname.add_all_resources(api, '{}/<string:hostname>'.format(path))

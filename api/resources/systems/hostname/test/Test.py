@@ -17,12 +17,12 @@ class Test(Resource):
     
     # query for currently running tests
     sql_query = """
-            SELECT tests_runs.id 
-            FROM tests_runs, hostnames
-            WHERE hostnames.id = tests_runs.hostnames_id
-            AND hostnames.hostname = %s
-            AND tests_runs.end_timestamp = %s
-        """
+        SELECT tests_runs.id 
+        FROM tests_runs, hostnames
+        WHERE hostnames.id = tests_runs.hostnames_id
+        AND hostnames.hostname = %s
+        AND tests_runs.end_timestamp = %s
+    """
     values = (hostname, NULL_TIMESTAMP)
     cursor.execute(sql_query, values)
     records = cursor.fetchall()
@@ -34,11 +34,6 @@ class Test(Resource):
     # otherwise list test_run id's, returning 202 OK.
     return {'message' : '{} currently running tests with tests_runs id = {}'.format(hostname, records)}, 200
 
-  @staticmethod
-  def add_all_resources(api, path):
-    """Directly add sub-resources of test."""
-    return
-
 def add_all_resources(api, path):
   """Recursively adds all sub-resources in the 'test' endpoint.
 
@@ -46,5 +41,6 @@ def add_all_resources(api, path):
       api:  flask_restful Api object.
       path: string path for current resource. Example: 'api/systems/.../test'
   """
+  # register tests as an api resource
   api.add_resource(Test, path)
-  Test.add_all_resources(api, path)
+  # directly add sub-resources of tests <HERE>

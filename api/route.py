@@ -1,7 +1,7 @@
 # Resources
 from .resources.systems import Systems
 from .resources.tests import Tests
-from .resources.testruns import Testruns
+from .resources.testsruns import Testsruns
 
 from flask import Blueprint
 from flask_restful import Api
@@ -12,4 +12,4 @@ api = Api(api_bp)
 # Route
 Systems.add_all_resources(api, '/systems')
 Tests.add_all_resources(api, '/tests')
-Testruns.add_all_resources(api, '/testruns')
+Testsruns.add_all_resources(api, '/testsruns')
