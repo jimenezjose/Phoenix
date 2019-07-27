@@ -67,6 +67,15 @@ CREATE TABLE `tests` (
 	PRIMARY KEY (`id`)
 );
 
+/* added table to queue tests on currently running tests_runs on a busy server */
+CREATE TABLE `tests_runs_queue` (
+        `id` INT NOT NULL AUTO_INCREMENT,
+        `test_runs_id` INT NOT NULL,
+        `test_id` INT NOT NULL,
+        `completed` BOOLEAN NOT NULL DEFAULT '0',
+        PRIMARY KEY (`id`)
+);
+
 CREATE TABLE `tests_runs` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`hostnames_id` INT NOT NULL,

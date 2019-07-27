@@ -41,7 +41,10 @@ class Systems(Resource):
     args = parser.parse_args()
 
     # check if working hostname already exists in db.
-    sql_query = 'SELECT hostname FROM hostnames WHERE retired = "0" AND hostname = %s'
+    sql_query = """
+        SELECT hostname FROM hostnames
+        WHERE retired = "0" AND hostname = %s
+    """
     values = (args['hostname'],)
     cursor.execute(sql_query, values)
     records = cursor.fetchall()
@@ -51,12 +54,15 @@ class Systems(Resource):
       return {'message' : 'unretired hostname, {}, already exists'.format(args['hostname'])}, 409
 
     # otherwise, insert hostname into db.
-    sql_insert = 'INSERT INTO hostnames (hostname) VALUES (%s)'
+    sql_insert = """
+        INSERT INTO hostnames 
+        (hostname) VALUES (%s)
+    """
     values = (args['hostname'],)
     cursor.execute(sql_insert, values)
     db.commit()
 
-    return {'message' : 'inserted: {}'.format(str(args['hostname']))}, 201
+    return {'message' : 'inserted: {}'.format(args['hostname'])}, 201
 
 def add_all_resources(api, path):
   """Recursively adds all sub-resources in the 'system' resource.
