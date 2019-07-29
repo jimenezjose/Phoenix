@@ -80,8 +80,8 @@ CREATE TABLE `tests_runs` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`hostnames_id` INT NOT NULL,
 	`tests_id` INT NOT NULL,
-	`start_timestamp` TIMESTAMP NOT NULL,
-	`end_timestamp` TIMESTAMP NOT NULL,
+	`start_timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	`end_timestamp` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00',
 	`status` INT NOT NULL,
 	`notes` TEXT,
 	`config` TEXT,
@@ -99,7 +99,7 @@ CREATE TABLE `test_logs` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`test_runs_id` INT NOT NULL,
 	`files_id` blob NOT NULL,
-	`timestamp` TIMESTAMP NOT NULL,
+	`timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`)
 );
 

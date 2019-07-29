@@ -26,7 +26,7 @@ class Hostname(Resource):
 
     if not records:
       # if no records exist for hostname, return 404 error.
-      return {'message' : 'Hostname: {} not found.'.format(hostname)}, 404
+      return {'message' : 'Hostname: {}, Not Found.'.format(hostname)}, 404
 
     return {'message' : 'Info on: {} with id: {}'.format(hostname, records)}, 200
 
@@ -50,7 +50,7 @@ class Hostname(Resource):
 
     if not records:
       # if no records exist for hostname, return 404 error.
-      return {'message' : 'Hostname: {} not found.'.format(hostname)}, 404
+      return {'message' : 'Hostname: {}, Not Found.'.format(hostname)}, 404
 
     # otherwise update hostname and set its retired flag to true
     sql_update = """

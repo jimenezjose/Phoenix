@@ -7,7 +7,12 @@ class Systems(Resource):
   """System resource with class design inherited from flask_restful Resource."""
 
   def get(self):
-    """GET request for all unretired systems."""
+    """GET request for all unretired systems.
+
+    Returns:
+        A list of unretired systems (hostnames) in the database. Also,
+        Status Code 200 OK.
+    """
     db = get_db()
     cursor = db.cursor()
 

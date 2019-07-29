@@ -7,10 +7,9 @@ from api.db import (
 
 from flask_restful import Resource, reqparse
 
-
-''' /testruns/start '''
 class Start(Resource):
-  """testruns/start resource to begin a new testrun"""
+  """testruns/start resource to begin a new testrun."""
+
   def post(self):
     """POST request to begin testrun on 'hostname' with 'test'."""
     db = get_db()
