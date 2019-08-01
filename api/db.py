@@ -6,6 +6,10 @@ from flask.cli import with_appcontext
 # tests_runs constants
 NULL_TIMESTAMP = '0000-00-00 00:00:00'
 
+# retired flags
+HOSTNAME_RETIRED = '1'
+HOSTNAME_ACTIVE  = '0'
+
 # statuses
 STATUS_PASSED = 1
 STATUS_FAILED = 2
@@ -43,3 +47,24 @@ def close_db(error):
 def init_app(app):
   """Binds the cloe_db function to be invoked upon app closure."""
   app.teardown_appcontext(close_db)
+
+def execute_sql(command, db_commit=False):
+  """Insert into the mysql database.
+  
+  Args:
+      insert_str: string sql command to executed.
+
+  Returns:
+      The last row id affected by the sql insert command.
+  """
+  db = get_db()
+  cursor = db.cursor()
+
+  cursor.execute(command)
+
+  if db_commit is True:
+    db.commit()
+    return cursor.lastrowid
+
+  return cursor.fetchall()
+
