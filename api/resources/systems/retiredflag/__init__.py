@@ -1,24 +1,26 @@
 from api.db import (
     execute_sql,
-    HOSTNAME_RETIRED)
+    HOSTNAME_RETIRED,
+    HOSTNAME_ACTIVE)
 from .hostname import Hostname
-from .utils import (
-    validate_systems_statusflag,
+from api.resources.utils import (
+    validate_retiredflag,
+    validate_hostname,
     is_active,
     is_retired,
-    to_retiredflag)
+    to_hostname_status)
 
 from flask_restful import Resource, reqparse
 
-class Statusflag(Resource):
+class Retiredflag(Resource):
   """Statusflag that annotates a hostname system as 'retired' or 'active'."""
 
-  def get(self, statusflag):
-    """GET request for all systems labeled as 'statusflag' = {retired, active}
+  def get(self, retiredflag):
+    """GET request for all systems labeled as given by the 'retiredflag' 
     
     Args:
-        statusflag: string annotation of a system for a binary representation of an 'active' or 
-                    'retired' hostname.
+        retiredflag: string annotation of a system for a binary representation of an active '0' or 
+                     retired '1' hostname.
     
     Returns:
         Success:
@@ -28,17 +30,17 @@ class Statusflag(Resource):
             * (statusflag provided unknown) - not {active, retired}
                 Status Flag: 404 Not Found
     """
-    validate_systems_statusflag(statusflag)
-    retiredflag = to_retiredflag(statusflag)
+    validate_retiredflag(retiredflag)
+    hostname_status = to_hostname_status(retiredflag)
 
     records = execute_sql("""
         SELECT hostname FROM hostnames
         WHERE retired = '{}'
     """.format(retiredflag))
 
-    return {'message' : 'list of {} hostnames: {}'.format(statusflag, records)}, 200
+    return {'message' : 'list of {} hostnames: {}'.format(hostname_status, records)}, 200
 
-  def post(self, statusflag):
+  def post(self, retiredflag):
     """POST request to add a hostname to the database.
     
     Returns:
@@ -57,14 +59,14 @@ class Statusflag(Resource):
                 Status Code: 409 Conflict
     """
     parser = reqparse.RequestParser()
-    validate_systems_statusflag(statusflag)
-    retiredflag = to_retiredflag(statusflag)
-
+    validate_retiredflag(retiredflag)
+    hostname_status = to_hostname_status(retiredflag)
+    
     # require 'hostname' parameter from request. 
     parser.add_argument('hostname', required=True)
     args = parser.parse_args()
 
-    if not is_active(statusflag):
+    if is_retired(retiredflag):
       # Hostnames added to the database must be active, return status code 405 Method Not Allowed
       return {'message' : 'Hostname must initially be active to be added to the database'}, 405
 
@@ -76,7 +78,7 @@ class Statusflag(Resource):
 
     if records:
       # active hostname already exists, returning conflict status code 409.
-      return {'message' : 'active hostname, {}, already exists'.format(args['hostname'])}, 409
+      return {'message' : '{} hostname, {}, already exists'.format(hostname_status, args['hostname'])}, 409
 
     # otherwise, insert hostname into db.
     execute_sql("""
@@ -86,40 +88,32 @@ class Statusflag(Resource):
 
     return {'message' : 'inserted: {}'.format(args['hostname'])}, 201
 
-  def delete(self, statusflag):
+  def delete(self, retiredflag):
     """DELETE the hostname by setting the retired flag to True.
 
     Args:
         hostname: string name of system hostname passed through url.
     """
     parser = reqparse.RequestParser()
-    validate_systems_statusflag(statusflag)
-    retiredflag = to_retiredflag(statusflag)
+    validate_retiredflag(retiredflag)
 
     # require 'hostname' parameter from request. 
     parser.add_argument('hostname', required=True)
     args = parser.parse_args()
 
-    if not is_active(statusflag):
+    if is_retired(retiredflag):
         # Only remove active hostnames; return 405 Method Not Allowed
         return {'message' : 'The method is not allowed for the requested URL.'}, 405
 
-    # query for hostname
-    records = execute_sql("""
-        SELECT id FROM hostnames 
-        WHERE hostname = '{}' AND retired = '{}'
-    """.format(args['hostname'], retiredflag))
+    # validate active hostname
+    validate_hostname(args['hostname'], HOSTNAME_ACTIVE)
 
-    if not records:
-      # if no records exist for hostname, return 404 error.
-      return {'message' : 'Hostname: {}, Not Found.'.format(args['hostname'])}, 404
-
-    # otherwise update hostname and set its retired flag to true
+    # update active hostname to retired
     execute_sql("""
         UPDATE hostnames 
         SET retired = '{}' 
         WHERE hostname = '{}' AND retired = '{}'
-    """.format(HOSTNAME_RETIRED, args['hostname'], retiredflag), db_commit=True)
+    """.format(HOSTNAME_RETIRED, args['hostname'], HOSTNAME_ACTIVE), db_commit=True)
 
     return {'message' : 'DELETE hostname: {} (set as retired with id: {})'.format(args['hostname'], records)}, 200
 
@@ -133,6 +127,6 @@ class Statusflag(Resource):
         path: string path for current resource. Example: 'api/systems/active'
     """
     # register systems as an api resource
-    api.add_resource(Statusflag, path)
+    api.add_resource(Retiredflag, path)
     # directly add sub-resources of systems/<string:statusflag>
     Hostname.add_all_resources(api, '{}/<string:hostname>'.format(path))

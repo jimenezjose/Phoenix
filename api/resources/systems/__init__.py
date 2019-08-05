@@ -1,5 +1,5 @@
 from api.db import execute_sql
-from .statusflag import Statusflag
+from .retiredflag import Retiredflag
 
 from flask_restful import Resource, reqparse
 
@@ -28,4 +28,4 @@ class Systems(Resource):
     # register systems as an api resource
     api.add_resource(Systems, path)
     # directly add sub-resources of system
-    Statusflag.add_all_resources(api, '{}/<string:statusflag>'.format(path))
+    Retiredflag.add_all_resources(api, '{}/<string:retiredflag>'.format(path))

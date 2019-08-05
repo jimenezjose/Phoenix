@@ -1,20 +1,20 @@
-from api.db import (
-    execute_sql,
-    HOSTNAME_RETIRED)
-from api.resources.systems.statusflag.utils import (
-    validate_systems_statusflag,
-    to_retiredflag)
 from .test import Test
+from api.db import execute_sql
+from api.resources.utils import (
+    validate_retiredflag,
+    validate_hostname,
+    to_hostname_status)
 
 from flask_restful import Resource
 
 class Hostname(Resource):
   """Isolate a specific systems/hostname for info."""
 
-  def get(self, statusflag, hostname):
+  def get(self, retiredflag, hostname):
     """GET request for information about hostname
 
     Args:
+        retiredflag: binary representation of a retired system.
         hostname: string name of system hostname passed through url.
 
     Returns:
@@ -26,20 +26,17 @@ class Hostname(Resource):
             * (hostname did not exist in the database)
                 Status Code: 404 Not Found
     """
-    validate_systems_statusflag(statusflag)
-    retiredflag = to_retiredflag(statusflag)
+    validate_retiredflag(retiredflag)
+    validate_hostname(hostname, statusflag)
+    hostname_status = to_hostname_status(retiredflag)
 
-    # query for hostname
+    # query for hostname information
     records = execute_sql("""
         SELECT id FROM hostnames 
         WHERE hostname = '{}' AND retired = '{}'
     """.format(hostname, retiredflag))
 
-    if not records:
-      # if no records exist for hostname, return 404 error.
-      return {'message' : '{} Hostname: {}, Not Found.'.format(statusflag, hostname)}, 404
-
-    return {'message' : 'Info on: {} with id: {}'.format(hostname, records)}, 200
+    return {'message' : 'Info on {} {} with id: {}'.format(hostname_status, hostname, records)}, 200
 
   @staticmethod  
   def add_all_resources(api, path):
