@@ -1,20 +1,20 @@
 from .test import Test
-from api.db import execute_sql
-from api.resources.utils import (
-    validate_retiredflag,
+from api.db import (
+    execute_sql,
+    validate_hostname_status,
     validate_hostname,
-    to_hostname_status)
+    to_retiredflag)
 
 from flask_restful import Resource
 
 class Hostname(Resource):
   """Isolate a specific systems/hostname for info."""
 
-  def get(self, retiredflag, hostname):
+  def get(self, hostname_status, hostname):
     """GET request for information about hostname
 
     Args:
-        retiredflag: binary representation of a retired system.
+        hostname_status: binary representation of a retired system.
         hostname: string name of system hostname passed through url.
 
     Returns:
@@ -22,13 +22,13 @@ class Hostname(Resource):
             * (valid query for an existing hostname)
                 Status Code: 200 OK
         Failure:
-            * (unkown statusflag priovided) - therefore incorrect url provided
+            * (unkown status priovided) - therefore incorrect url provided
             * (hostname did not exist in the database)
                 Status Code: 404 Not Found
     """
-    validate_retiredflag(retiredflag)
-    validate_hostname(hostname, statusflag)
-    hostname_status = to_hostname_status(retiredflag)
+    validate_hostname_status(hostname_status)
+    retiredflag = to_retiredflag(hostname_status)
+    validate_hostname(hostname, retiredflag)
 
     # query for hostname information
     records = execute_sql("""

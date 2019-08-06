@@ -4,11 +4,11 @@ from api.db import (
     STATUS_RUNNING, 
     STATUS_SCHEDULED, 
     STATUS_STARTED,
-    NULL_TIMESTAMP) 
-
-from api.resources.utils import (
+    NULL_TIMESTAMP,
     validate_hostname,
-    validate_tests_name)
+    validate_tests_name,
+    get_running_tests,
+    get_tests_queue) 
 
 from flask_restful import Resource, reqparse
 
@@ -29,25 +29,9 @@ class Start(Resource):
     validate_tests_name(args['tests_name'])
 
     # query for currently running tests on the given hostname
-    running_tests = execute_sql("""
-        SELECT hostnames.hostname 
-        FROM hostnames, tests_runs
-        WHERE hostnames.hostname = '{}'
-        AND hostnames.id = tests_runs.hostnames_id
-        AND tests_runs.end_timestamp = '{}'
-        AND tests_runs.status = '{}'
-        AND hostnames.retired = '{}'
-    """.format(args['hostname'], NULL_TIMESTAMP, STATUS_RUNNING, HOSTNAME_ACTIVE))
-
+    running_tests = get_running_tests(args['hostname'])
     # query for queued tests in line to occupy hostname
-    tests_queue = execute_sql("""
-        SELECT hostnames.hostname 
-        FROM hostnames, tests_runs, tests_runs_queue
-        WHERE hostnames.hostname = '{}'
-        AND hostnames.id = tests_runs.hostnames_id
-        AND tests_runs.id = tests_runs_queue.test_runs_id
-        AND hostnames.retired = '{}'
-    """.format(args['hostname'], HOSTNAME_ACTIVE))
+    tests_queue = get_tests_queue(args['hostname'])
 
     # register status of tests run
     args['status'] = STATUS_SCHEDULED

@@ -1,5 +1,9 @@
-from api.db import execute_sql
-from .retiredflag import Retiredflag
+from .hostnameStatus import HostnameStatus
+from api.db import (
+    execute_sql,
+    is_retired,
+    HOSTNAME_STATUS_ACTIVE,
+    HOSTNAME_STATUS_RETIRED)
 
 from flask_restful import Resource, reqparse
 
@@ -15,7 +19,25 @@ class Systems(Resource):
     """
     # query for hostnames with their status
     records = execute_sql('SELECT hostname, retired FROM hostnames')
-    return {'message' : 'list of hostnames: {}'.format(records)}, 200
+
+    json_dict = {'hostnames' : {HOSTNAME_STATUS_ACTIVE : [], HOSTNAME_STATUS_RETIRED : []}}
+
+    active_list = []
+    retired_list = []
+    for server in records:
+      # categorize hostnames to retired/active bucket lists
+      hostname = server[0] 
+      retiredflag = server[1]
+
+      if is_retired(retiredflag):
+        retired_list.append(hostname)
+      else:
+        active_list.append(hostname)
+
+    json_dict['hostnames'][HOSTNAME_STATUS_ACTIVE] = active_list
+    json_dict['hostnames'][HOSTNAME_STATUS_RETIRED] = retired_list
+
+    return json_dict, 200
  
   @staticmethod
   def add_all_resources(api, path):
@@ -28,4 +50,4 @@ class Systems(Resource):
     # register systems as an api resource
     api.add_resource(Systems, path)
     # directly add sub-resources of system
-    Retiredflag.add_all_resources(api, '{}/<string:retiredflag>'.format(path))
+    HostnameStatus.add_all_resources(api, '{}/<string:hostname_status>'.format(path))

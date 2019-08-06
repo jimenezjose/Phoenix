@@ -1,46 +1,53 @@
 from api.db import (
     execute_sql,
     HOSTNAME_RETIRED,
-    HOSTNAME_ACTIVE)
-from .hostname import Hostname
-from api.resources.utils import (
-    validate_retiredflag,
+    HOSTNAME_ACTIVE,
+    validate_hostname_status,
     validate_hostname,
-    is_active,
     is_retired,
-    to_hostname_status)
+    to_retiredflag)
+from .hostname import Hostname
 
 from flask_restful import Resource, reqparse
 
-class Retiredflag(Resource):
+class HostnameStatus(Resource):
   """Statusflag that annotates a hostname system as 'retired' or 'active'."""
 
-  def get(self, retiredflag):
-    """GET request for all systems labeled as given by the 'retiredflag' 
+  def get(self, hostname_status):
+    """GET request for all systems labeled as given by the 'hostname_status' 
     
     Args:
-        retiredflag: string annotation of a system for a binary representation of an active '0' or 
-                     retired '1' hostname.
+        hostname_status: string annotation of a system for a binary representation of an 'active' 
+                         or 'retired' hostname.
     
     Returns:
         Success:
-            * (valid statusflag provided)
-                Status Flag: 200 OK
+            * (valid status provided)
+                Status Code: 200 OK
         Failure:
-            * (statusflag provided unknown) - not {active, retired}
-                Status Flag: 404 Not Found
+            * (status provided unknown) - not {active, retired}
+                Status Code: 404 Not Found
     """
-    validate_retiredflag(retiredflag)
-    hostname_status = to_hostname_status(retiredflag)
+    validate_hostname_status(hostname_status)
+    retiredflag = to_retiredflag(hostname_status) 
 
     records = execute_sql("""
         SELECT hostname FROM hostnames
         WHERE retired = '{}'
     """.format(retiredflag))
 
-    return {'message' : 'list of {} hostnames: {}'.format(hostname_status, records)}, 200
+    json_dict = {'hostnames' : {hostname_status : []}}
 
-  def post(self, retiredflag):
+    hostname_list = []
+    for server in records:
+      hostname = server[0]
+      hostname_list.append(hostname)
+
+    json_dict['hostnames'][hostname_status] = hostname_list
+
+    return json_dict, 200
+
+  def post(self, hostname_status):
     """POST request to add a hostname to the database.
     
     Returns:
@@ -49,7 +56,7 @@ class Retiredflag(Resource):
                 Status Code: 201 Created
 
         Failure: 
-            * (statusflag provided does not exist)
+            * (status provided does not exist)
                 Status Code: 404 Not Found
             * (attempt to add a non-active hostname not allowed)
                 Status Code: 405 Method Not Allowed
@@ -59,8 +66,8 @@ class Retiredflag(Resource):
                 Status Code: 409 Conflict
     """
     parser = reqparse.RequestParser()
-    validate_retiredflag(retiredflag)
-    hostname_status = to_hostname_status(retiredflag)
+    validate_hostname_status(hostname_status)
+    retiredflag = to_retiredflag(hostname_status)
     
     # require 'hostname' parameter from request. 
     parser.add_argument('hostname', required=True)
@@ -88,25 +95,22 @@ class Retiredflag(Resource):
 
     return {'message' : 'inserted: {}'.format(args['hostname'])}, 201
 
-  def delete(self, retiredflag):
-    """DELETE the hostname by setting the retired flag to True.
-
-    Args:
-        hostname: string name of system hostname passed through url.
-    """
+  def delete(self, hostname_status):
+    """DELETE the hostname by setting the retired flag to True."""
     parser = reqparse.RequestParser()
-    validate_retiredflag(retiredflag)
+    validate_hostname_status(hostname_status)
+    retiredflag = to_retiredflag(hostname_status)
 
     # require 'hostname' parameter from request. 
     parser.add_argument('hostname', required=True)
     args = parser.parse_args()
 
     if is_retired(retiredflag):
-        # Only remove active hostnames; return 405 Method Not Allowed
+        # only remove active hostnames; return 405 Method Not Allowed
         return {'message' : 'The method is not allowed for the requested URL.'}, 405
 
     # validate active hostname
-    validate_hostname(args['hostname'], HOSTNAME_ACTIVE)
+    validate_hostname(args['hostname'], HOSTNAME_ACTIVE) 
 
     # update active hostname to retired
     execute_sql("""
@@ -120,13 +124,13 @@ class Retiredflag(Resource):
   
   @staticmethod  
   def add_all_resources(api, path):
-    """Recursively adds all sub-resources in the 'system/<string:statusflag>' resource.
+    """Recursively adds all sub-resources in the 'system/<string:hostname_status>' resource.
 
     Args:
         api:  flask_restful Api object.
         path: string path for current resource. Example: 'api/systems/active'
     """
     # register systems as an api resource
-    api.add_resource(Retiredflag, path)
-    # directly add sub-resources of systems/<string:statusflag>
+    api.add_resource(HostnameStatus, path)
+    # directly add sub-resources of systems/<string:hostname_status>
     Hostname.add_all_resources(api, '{}/<string:hostname>'.format(path))
