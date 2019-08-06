@@ -36,16 +36,16 @@ class HostnameStatus(Resource):
         WHERE retired = '{}'
     """.format(retiredflag))
 
-    json_dict = {'hostnames' : {hostname_status : []}}
+    response = {'hostnames' : {hostname_status : []}}
 
     hostname_list = []
     for server in records:
       hostname = server[0]
       hostname_list.append(hostname)
 
-    json_dict['hostnames'][hostname_status] = hostname_list
+    response['hostnames'][hostname_status] = hostname_list
 
-    return json_dict, 200
+    return response, 200
 
   def post(self, hostname_status):
     """POST request to add a hostname to the database.

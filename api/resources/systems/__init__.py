@@ -20,7 +20,7 @@ class Systems(Resource):
     # query for hostnames with their status
     records = execute_sql('SELECT hostname, retired FROM hostnames')
 
-    json_dict = {'hostnames' : {HOSTNAME_STATUS_ACTIVE : [], HOSTNAME_STATUS_RETIRED : []}}
+    response = {'hostnames' : {HOSTNAME_STATUS_ACTIVE : [], HOSTNAME_STATUS_RETIRED : []}}
 
     active_list = []
     retired_list = []
@@ -34,10 +34,10 @@ class Systems(Resource):
       else:
         active_list.append(hostname)
 
-    json_dict['hostnames'][HOSTNAME_STATUS_ACTIVE] = active_list
-    json_dict['hostnames'][HOSTNAME_STATUS_RETIRED] = retired_list
+    response['hostnames'][HOSTNAME_STATUS_ACTIVE] = active_list
+    response['hostnames'][HOSTNAME_STATUS_RETIRED] = retired_list
 
-    return json_dict, 200
+    return response, 200
  
   @staticmethod
   def add_all_resources(api, path):
