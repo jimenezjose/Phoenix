@@ -1,9 +1,7 @@
 from .hostnameStatus import HostnameStatus
 from api.db import (
     execute_sql,
-    is_retired,
-    HOSTNAME_STATUS_ACTIVE,
-    HOSTNAME_STATUS_RETIRED)
+    get_hostnames_table)
 
 from flask_restful import Resource, reqparse
 
@@ -18,24 +16,10 @@ class Systems(Resource):
         Status Code 200 OK.
     """
     # query for hostnames with their status
-    records = execute_sql('SELECT hostname, retired FROM hostnames')
+    hostnames_table = get_hostnames_table()
 
-    response = {'hostnames' : {HOSTNAME_STATUS_ACTIVE : [], HOSTNAME_STATUS_RETIRED : []}}
-
-    active_list = []
-    retired_list = []
-    for server in records:
-      # categorize hostnames to retired/active bucket lists
-      hostname = server[0] 
-      retiredflag = server[1]
-
-      if is_retired(retiredflag):
-        retired_list.append(hostname)
-      else:
-        active_list.append(hostname)
-
-    response['hostnames'][HOSTNAME_STATUS_ACTIVE] = active_list
-    response['hostnames'][HOSTNAME_STATUS_RETIRED] = retired_list
+    #response = {'hostnames' : {HOSTNAME_STATUS_ACTIVE : [], HOSTNAME_STATUS_RETIRED : []}}
+    response = {'hostnames' : hostnames_table}
 
     return response, 200
  

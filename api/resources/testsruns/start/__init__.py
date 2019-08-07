@@ -8,7 +8,7 @@ from api.db import (
     validate_hostname,
     validate_tests_name,
     get_running_tests,
-    get_tests_queue) 
+    get_tests_runs_queue_table) 
 
 from flask_restful import Resource, reqparse
 

@@ -53,16 +53,18 @@ def init_app(app):
   app.teardown_appcontext(close_db)
 
 def execute_sql(command, db_commit=False):
-  """Insert into the mysql database.
+  """Executes a single sql command on the database.
   
   Args:
-      insert_str: string sql command to executed.
+      command: mysql command.
+      db_commit: inserting data into the database. 
 
   Returns:
-      The last row id affected by the sql insert command.
+      if db_commit is False then return the last row id inserted into a db table.
+      otherwise return a list of dictionaries corresponding to the db table queried.
   """
   db = get_db()
-  cursor = db.cursor()
+  cursor = db.cursor(dictionary=True)
 
   cursor.execute(command)
 
@@ -85,7 +87,7 @@ def validate_hostname_status(hostname_status, http_error_code=404):
   errors = {}
   
   if not is_active(hostname_status) and not is_retired(hostname_status):
-    errors.update({'hostname_status' : 'Provided flag \'{}\' is not valid.'.format(statusflag)})
+    errors.update({'hostname_status' : 'Provided hostname status \'{}\' is not valid.'.format(hostname_status)})
 
   if errors:
     abort(http_error_code, message=errors)
@@ -160,51 +162,76 @@ def validate_tests_name(tests_name, http_error_code=404):
   if errors:
     abort(http_error_code, message=errors)
 
+def get_hostnames_table(retiredflag=None):
+  """GET all hostnames with the given retiredflag.
+  
+  Args:
+      retiredflag: Optional argument that represents if the systems is retired or active. 
+                   If retired is not passed in function call, retiredflag will act as a wildcard.
+  """
+  sql_command = """
+      SELECT id, hostname, retired
+      FROM hostnames
+  """
+
+  if retiredflag is not None:
+    # query hostnames only with the given retiredflag 
+    validate_retiredflag(retiredflag)
+    sql_command = '{} WHERE retired = "{}"'.format(sql_command, retiredflag)
+
+  hostnames_table = execute_sql(sql_command)
+
+  return hostnames_table
+
 def get_running_tests(hostname=None):
   """GET currently running tests_runs on given hostname.
 
     Args:
         hostname: system hostname if none query as wildcard.
   """
-
-  # query running tests on given hostname
+  # query for all running tests
   sql_command = """
-      SELECT hostnames.hostname 
-      FROM hostnames, tests_runs
-      WHERE hostnames.hostname = '{}'
-      AND hostnames.id = tests_runs.hostnames_id
-      AND tests_runs.end_timestamp = '{}'
-      AND tests_runs.status = '{}'
-      AND hostnames.retired = '{}'
-  """.format(hostname, NULL_TIMESTAMP, STATUS_RUNNING, HOSTNAME_ACTIVE)
-
-  if hostname is None:
-    # query all running_tests
-    sql_command = """
       SELECT hostnames.hostname 
       FROM hostnames, tests_runs
       WHERE tests_runs.end_timestamp = '{}'
       AND tests_runs.status = '{}'
       AND hostnames.retired = '{}'
-    """.format(NULL_TIMESTAMP, STATUS_RUNNING, HOSTNAME_ACTIVE)
+  """.format(NULL_TIMESTAMP, STATUS_RUNNING, HOSTNAME_ACTIVE)
+  
+  if hostname is not None:
+    # query only running tests on given hostname
+    validate_hostname(hostname)
+    sql_command = '{} AND hostnames.hostname = "{}"'.format(sql_command, hostname)
 
   running_tests = execute_sql(sql_command)
 
   return running_tests
 
-def get_tests_queue(hostname):
-  """GET tests_queue for given hostname"""
+def get_tests_runs_queue_table(hostname=None):
+  """GET tests_runs_queue for given hostname.
 
-  tests_queue = execute_sql("""
+  Args: 
+      hostname: Optional argument that represents the system name.
+                If not provided hostname is a wildcard.
+  """
+  # query for all tests runs in the queue
+  sql_command =  """
       SELECT hostnames.hostname 
       FROM hostnames, tests_runs, tests_runs_queue
-      WHERE hostnames.hostname = '{}'
-      AND hostnames.id = tests_runs.hostnames_id
+      WHERE hostnames.id = tests_runs.hostnames_id
       AND tests_runs.id = tests_runs_queue.test_runs_id
+      AND tests_runs.status = '{}'
       AND hostnames.retired = '{}'
-  """.format(hostname, HOSTNAME_ACTIVE))
+  """.format(STATUS_RUNNING, HOSTNAME_ACTIVE)
 
-  return tests_queue
+  if hostname is not None:
+    # query for queued tests runs on the given hostname
+    validate_hostname(hostname)
+    sql_command = '{} AND hostnames.hostname = "{}"'.format(sql_command, hostname)
+
+  tests_runs_queue_table = execute_sql(sql_command)
+
+  return tests_runs_queue_table
 
 def is_retired(flag):
   return flag == HOSTNAME_RETIRED or flag == HOSTNAME_STATUS_RETIRED

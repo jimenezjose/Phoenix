@@ -40,7 +40,7 @@ class HostnameStatus(Resource):
 
     hostname_list = []
     for server in records:
-      hostname = server[0]
+      hostname = server['hostname']
       hostname_list.append(hostname)
 
     response['hostnames'][hostname_status] = hostname_list
@@ -75,7 +75,7 @@ class HostnameStatus(Resource):
 
     if is_retired(retiredflag):
       # Hostnames added to the database must be active, return status code 405 Method Not Allowed
-      return {'message' : 'Hostname must initially be active to be added to the database'}, 405
+      return {'message' : 'The method is not allowed for the requested URL.'}, 405
 
     # check if working hostname already exists in db.
     records = execute_sql("""
@@ -113,13 +113,13 @@ class HostnameStatus(Resource):
     validate_hostname(args['hostname'], HOSTNAME_ACTIVE) 
 
     # update active hostname to retired
-    execute_sql("""
+    rowid = execute_sql("""
         UPDATE hostnames 
         SET retired = '{}' 
         WHERE hostname = '{}' AND retired = '{}'
     """.format(HOSTNAME_RETIRED, args['hostname'], HOSTNAME_ACTIVE), db_commit=True)
 
-    return {'message' : 'DELETE hostname: {} (set as retired with id: {})'.format(args['hostname'], records)}, 200
+    return {'message' : 'DELETE hostname: {} (set as retired with id: {})'.format(args['hostname'], rowid)}, 200
 
   
   @staticmethod  
