@@ -8,8 +8,8 @@ from flask_restful import abort
 NULL_TIMESTAMP = '0000-00-00 00:00:00'
 
 # retired flags
-HOSTNAME_RETIRED = 1
-HOSTNAME_ACTIVE  = 0
+HOSTNAME_RETIRED = 'true'
+HOSTNAME_ACTIVE  = 'false'
 # retired flag status name
 HOSTNAME_STATUS_ACTIVE = 'active'
 HOSTNAME_STATUS_RETIRED = 'retired'
@@ -177,35 +177,13 @@ def get_hostnames_table(retiredflag=None):
   if retiredflag is not None:
     # query hostnames only with the given retiredflag 
     validate_retiredflag(retiredflag)
-    sql_command = '{} WHERE retired = "{}"'.format(sql_command, retiredflag)
+    sql_command = """
+        {} WHERE retired = '{}'
+    """.format(sql_command, retiredflag)
 
   hostnames_table = execute_sql(sql_command)
 
   return hostnames_table
-
-def get_running_tests(hostname=None):
-  """GET currently running tests_runs on given hostname.
-
-    Args:
-        hostname: system hostname if none query as wildcard.
-  """
-  # query for all running tests
-  sql_command = """
-      SELECT hostnames.hostname 
-      FROM hostnames, tests_runs
-      WHERE tests_runs.end_timestamp = '{}'
-      AND tests_runs.status = '{}'
-      AND hostnames.retired = '{}'
-  """.format(NULL_TIMESTAMP, STATUS_RUNNING, HOSTNAME_ACTIVE)
-  
-  if hostname is not None:
-    # query only running tests on given hostname
-    validate_hostname(hostname)
-    sql_command = '{} AND hostnames.hostname = "{}"'.format(sql_command, hostname)
-
-  running_tests = execute_sql(sql_command)
-
-  return running_tests
 
 def get_tests_runs_queue_table(hostname=None):
   """GET tests_runs_queue for given hostname.
@@ -227,11 +205,76 @@ def get_tests_runs_queue_table(hostname=None):
   if hostname is not None:
     # query for queued tests runs on the given hostname
     validate_hostname(hostname)
-    sql_command = '{} AND hostnames.hostname = "{}"'.format(sql_command, hostname)
+    sql_command = """
+        {} AND hostnames.hostname = '{}'
+    """.format(sql_command, hostname)
 
   tests_runs_queue_table = execute_sql(sql_command)
 
   return tests_runs_queue_table
+
+def get_running_tests(hostname=None):
+  """GET currently running tests_runs on given hostname.
+
+    Args:
+        hostname: system hostname if none query as wildcard.
+  """
+  # query for all running tests
+  sql_command = """
+      SELECT hostnames.hostname 
+      FROM hostnames, tests_runs
+      WHERE tests_runs.end_timestamp = '{}'
+      AND tests_runs.status = '{}'
+      AND hostnames.retired = '{}'
+  """.format(NULL_TIMESTAMP, STATUS_RUNNING, HOSTNAME_ACTIVE)
+  
+  if hostname is not None:
+    # query only running tests on given hostname
+    validate_hostname(hostname)
+    sql_command = """
+       {} AND hostnames.hostname = '{}'
+    """.format(sql_command, hostname)
+
+  running_tests = execute_sql(sql_command)
+
+  return running_tests
+
+def get_hostname(hostname, retiredflag=None):
+  """Gets hostname rows by hostname and with an optional retiredflag constraint."""
+  # query for hostname
+  sql_command = """
+      SELECT id, hostname, retired
+      FROM hostnames
+      WHERE hostname = '{}'
+  """.format(hostname)
+
+  if retiredflag is not None:
+    # only query for hostname with given retiredflag
+    sql_command = """
+        {} AND retired = '{}'
+    """.format(sql_command, retiredflag)
+
+  # list of hostnames that follow the criteria
+  hostname_row_list = execute_sql(sql_command)
+
+  return hostname_row_list
+
+def get_hostname_by_id(id):
+  """Gets hostnames row by row id in hostnames table."""
+  # query hostname id 
+  hostname_row_list = execute_sql("""
+    SELECT id, hostname, retired
+    FROM hostnames
+    WHERE id = '{}'
+  """.format(id))
+
+  # there is only one hostname with the given unique id
+  hostname_row = None
+  if hostname_row_list:
+    # valid id passed
+    hostname_row = hostname_row_list[0]
+
+  return hostname_row
 
 def is_retired(flag):
   return flag == HOSTNAME_RETIRED or flag == HOSTNAME_STATUS_RETIRED

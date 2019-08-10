@@ -1,7 +1,7 @@
 CREATE TABLE `hostnames` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`hostname` varchar(255) NOT NULL,
-	`retired` INT(1) NOT NULL DEFAULT '0',
+	`retired` ENUM('true', 'false') NOT NULL DEFAULT 'false',
 	PRIMARY KEY (`id`)
 );
 
@@ -72,7 +72,7 @@ CREATE TABLE `tests_runs_queue` (
         `id` INT NOT NULL AUTO_INCREMENT,
         `test_runs_id` INT NOT NULL,
         `test_id` INT NOT NULL,
-        `completed` BOOLEAN NOT NULL DEFAULT '0',
+        `completed` ENUM('true', 'false') NOT NULL DEFAULT 'false',
         PRIMARY KEY (`id`)
 );
 
@@ -107,7 +107,7 @@ CREATE TABLE `commands_queue` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`test_runs_id` INT NOT NULL,
 	`commands_id` INT NOT NULL,
-	`completed` BOOLEAN NOT NULL DEFAULT '0',
+	`completed` ENUM('true', 'false') NOT NULL DEFAULT 'false',
 	PRIMARY KEY (`id`)
 );
 

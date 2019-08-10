@@ -4,6 +4,9 @@ from api.db import (
     HOSTNAME_ACTIVE,
     validate_hostname_status,
     validate_hostname,
+    get_hostnames_table,
+    get_hostname,
+    get_hostname_by_id,
     is_retired,
     to_retiredflag)
 from .hostname import Hostname
@@ -31,21 +34,9 @@ class HostnameStatus(Resource):
     validate_hostname_status(hostname_status)
     retiredflag = to_retiredflag(hostname_status) 
 
-    records = execute_sql("""
-        SELECT hostname FROM hostnames
-        WHERE retired = '{}'
-    """.format(retiredflag))
+    hostnames_table = get_hostnames_table(retiredflag)
 
-    response = {'hostnames' : {hostname_status : []}}
-
-    hostname_list = []
-    for server in records:
-      hostname = server['hostname']
-      hostname_list.append(hostname)
-
-    response['hostnames'][hostname_status] = hostname_list
-
-    return response, 200
+    return {'hostnames' : hostnames_table}, 200
 
   def post(self, hostname_status):
     """POST request to add a hostname to the database.
@@ -78,22 +69,21 @@ class HostnameStatus(Resource):
       return {'message' : 'The method is not allowed for the requested URL.'}, 405
 
     # check if working hostname already exists in db.
-    records = execute_sql("""
-        SELECT hostname FROM hostnames
-        WHERE retired = '{}' AND hostname = '{}'
-    """.format(retiredflag, args['hostname']))
+    existing_hostname = get_hostname(args['hostname'], retiredflag)
 
-    if records:
+    if existing_hostname:
       # active hostname already exists, returning conflict status code 409.
-      return {'message' : '{} hostname, {}, already exists'.format(hostname_status, args['hostname'])}, 409
+      return {'message' : '{} hostname, {}, already exists. Insertion not allowed.'.format(hostname_status, args['hostname'])}, 409
 
     # otherwise, insert hostname into db.
-    execute_sql("""
+    rowid = execute_sql("""
         INSERT INTO hostnames 
         (hostname) VALUES ('{}')
     """.format(args['hostname']), db_commit=True)
 
-    return {'message' : 'inserted: {}'.format(args['hostname'])}, 201
+    inserted_row = get_hostname_by_id(rowid)
+
+    return inserted_row
 
   def delete(self, hostname_status):
     """DELETE the hostname by setting the retired flag to True."""
@@ -112,12 +102,22 @@ class HostnameStatus(Resource):
     # validate active hostname
     validate_hostname(args['hostname'], HOSTNAME_ACTIVE) 
 
+    # get all info on VALID hostname of interest. 
+    hostname_list = get_hostname(args['hostname'], HOSTNAME_ACTIVE)
+    # only one unique ACTIVE hostname will exist guaranteed.
+    hostname_row = hostname_list[0]
+
     # update active hostname to retired
-    rowid = execute_sql("""
+    execute_sql("""
         UPDATE hostnames 
         SET retired = '{}' 
         WHERE hostname = '{}' AND retired = '{}'
     """.format(HOSTNAME_RETIRED, args['hostname'], HOSTNAME_ACTIVE), db_commit=True)
+
+    # get updated hostname row 
+    updated_hostname_row = get_hostname_by_id(hostname_row['id'])
+
+    return updated_hostname_row
 
     return {'message' : 'DELETE hostname: {} (set as retired with id: {})'.format(args['hostname'], rowid)}, 200
 

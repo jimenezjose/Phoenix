@@ -15,13 +15,10 @@ class Systems(Resource):
         A list of systems (hostnames) in the database. Also,
         Status Code 200 OK.
     """
-    # query for hostnames with their status
+    # query for all hostnames in the database
     hostnames_table = get_hostnames_table()
 
-    #response = {'hostnames' : {HOSTNAME_STATUS_ACTIVE : [], HOSTNAME_STATUS_RETIRED : []}}
-    response = {'hostnames' : hostnames_table}
-
-    return response, 200
+    return {'hostnames' : hostnames_table}, 200
  
   @staticmethod
   def add_all_resources(api, path):
