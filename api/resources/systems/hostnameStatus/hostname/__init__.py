@@ -3,6 +3,7 @@ from api.db import (
     execute_sql,
     validate_hostname_status,
     validate_hostname,
+    get_hostnames,
     to_retiredflag)
 
 from flask_restful import Resource
@@ -31,10 +32,11 @@ class Hostname(Resource):
     validate_hostname(hostname, retiredflag)
 
     # query for hostname information
-    records = execute_sql("""
-        SELECT id FROM hostnames 
-        WHERE hostname = '{}' AND retired = '{}'
-    """.format(hostname, retiredflag))
+    hostnames_list = get_hostnames(hostname, retiredflag)
+
+    return {'hostnames' : hostnames_list} 
+
+    return hostname_info
 
     return {'message' : 'Info on {} {} with id: {}'.format(hostname_status, hostname, records)}, 200
 

@@ -1,3 +1,4 @@
+# NOTE DELETE CANNOT OCCUR IF HOSTNAME HAS RUNNING OR QUEUED TESTS.
 from api.db import (
     execute_sql,
     HOSTNAME_RETIRED,
@@ -5,7 +6,7 @@ from api.db import (
     validate_hostname_status,
     validate_hostname,
     get_hostnames_table,
-    get_hostname,
+    get_hostnames,
     get_hostname_by_id,
     is_retired,
     to_retiredflag)
@@ -34,6 +35,7 @@ class HostnameStatus(Resource):
     validate_hostname_status(hostname_status)
     retiredflag = to_retiredflag(hostname_status) 
 
+    # Get all hostnames with 'retiredflag'
     hostnames_table = get_hostnames_table(retiredflag)
 
     return {'hostnames' : hostnames_table}, 200
@@ -69,7 +71,7 @@ class HostnameStatus(Resource):
       return {'message' : 'The method is not allowed for the requested URL.'}, 405
 
     # check if working hostname already exists in db.
-    existing_hostname = get_hostname(args['hostname'], retiredflag)
+    existing_hostname = get_hostnames(args['hostname'], retiredflag)
 
     if existing_hostname:
       # active hostname already exists, returning conflict status code 409.
@@ -103,7 +105,7 @@ class HostnameStatus(Resource):
     validate_hostname(args['hostname'], HOSTNAME_ACTIVE) 
 
     # get all info on VALID hostname of interest. 
-    hostname_list = get_hostname(args['hostname'], HOSTNAME_ACTIVE)
+    hostname_list = get_hostnames(args['hostname'], HOSTNAME_ACTIVE)
     # only one unique ACTIVE hostname will exist guaranteed.
     hostname_row = hostname_list[0]
 
