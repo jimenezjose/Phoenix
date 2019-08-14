@@ -1,4 +1,6 @@
 # NOTE DELETE CANNOT OCCUR IF HOSTNAME HAS RUNNING OR QUEUED TESTS.
+# TODO delet by hostname id optional argument in delete request
+from .hostname import Hostname
 from api.db import (
     execute_sql,
     HOSTNAME_RETIRED,
@@ -8,11 +10,12 @@ from api.db import (
     get_hostnames_table,
     get_hostnames,
     get_hostname_by_id,
+    validate,
+    delete_hostname,
     is_retired,
     to_retiredflag)
-from .hostname import Hostname
 
-from flask_restful import Resource, reqparse
+from flask_restful import Resource, reqparse, abort
 
 class HostnameStatus(Resource):
   """Statusflag that annotates a hostname system as 'retired' or 'active'."""
@@ -89,27 +92,42 @@ class HostnameStatus(Resource):
 
   def delete(self, hostname_status):
     """DELETE the hostname by setting the retired flag to True."""
-    parser = reqparse.RequestParser()
-    validate_hostname_status(hostname_status)
-    retiredflag = to_retiredflag(hostname_status)
-
-    # require 'hostname' parameter from request. 
-    parser.add_argument('hostname', required=True)
-    args = parser.parse_args()
-
-    if is_retired(retiredflag):
+    if is_retired(hostname_status):
         # only remove active hostnames; return 405 Method Not Allowed
         return {'message' : 'The method is not allowed for the requested URL.'}, 405
 
-    # validate active hostname
-    validate_hostname(args['hostname'], HOSTNAME_ACTIVE) 
+    # require 'hostname' parameter from request. 
+    parser = reqparse.RequestParser()
+    parser.add_argument('hostname', type=str)
+    parser.add_argument('hostname_id', type=int)
+    args = parser.parse_args()
+
+    if args['hostname'] is None and args['hostname_id'] is None:
+      # at least one argument is required otherwise throw 400 Bad Request.
+      errors = {
+          'hostname' : 'Missing parameter in JSON body',
+          'hostname_id' : 'Missing parameter in JSON body',
+          'message' : 'At least one paramter is required.',
+      }
+      abort(400, message=errors)
+
+    # validate url hostname status
+    validate(hostname_status=hostname_status, http_error_code=404)
+    # `
+    validate(hostname=args['hostname'], hostname_id=args['hostname_id'], http_error_code=400)
+
+    if args['hostname_id']:
+      return delete_hostname(hostname_id=args['hostname_id'])
+    elif args['hostname']:
+      return delete_hostname(hostname=args['hostname'])
 
     # get all info on VALID hostname of interest. 
     hostname_list = get_hostnames(args['hostname'], HOSTNAME_ACTIVE)
     # only one unique ACTIVE hostname will exist guaranteed.
     hostname_row = hostname_list[0]
+    
+    return 'error'
 
-    # update active hostname to retired
     execute_sql("""
         UPDATE hostnames 
         SET retired = '{}' 

@@ -7,7 +7,6 @@ from api.db import (
     NULL_TIMESTAMP,
     validate_hostname,
     validate_tests_name,
-    get_running_tests,
     get_tests_runs_queue) 
 
 from flask_restful import Resource, reqparse
@@ -29,7 +28,7 @@ class Start(Resource):
     validate_tests_name(args['tests_name'])
 
     # query for currently running tests on the given hostname
-    running_tests = get_running_tests(args['hostname'])
+    running_tests = get_tests_runs_table(args['hostname'], STATUS_RUNNING)
     # query for queued tests in line to occupy hostname
     tests_queue = get_tests_runs_queue(args['hostname'])
 

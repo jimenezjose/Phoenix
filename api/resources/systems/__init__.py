@@ -1,7 +1,5 @@
 from .hostnameStatus import HostnameStatus
-from api.db import (
-    execute_sql,
-    get_hostnames_table)
+from api.db import get_hostnames_table
 
 from flask_restful import Resource, reqparse
 

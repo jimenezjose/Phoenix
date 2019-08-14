@@ -2,6 +2,7 @@
 # validate tests_runs_status
 # single valide function with optional params
 # look up by tests_name
+# validate arguments from JSON body given 400 error not 404. this is not a db problem rather and route handling prob.
 import mysql.connector
 import click
 from flask import current_app, g
@@ -29,6 +30,10 @@ STATUS_SCHEDULED = 7
 STATUS_STARTED = 8
 STATUS_QUEUED = 9
 
+def init_app(app):
+  """Binds the cloe_db function to be invoked upon app closure."""
+  app.teardown_appcontext(close_db)
+
 def get_db():
   """Getter method to retrieve the current database connection.
     
@@ -53,10 +58,6 @@ def close_db(error):
   if db is not None:
     db.close()
 
-def init_app(app):
-  """Binds the cloe_db function to be invoked upon app closure."""
-  app.teardown_appcontext(close_db)
-
 def execute_sql(command, db_commit=False, dictionary=True):
   """Executes a single sql command on the database.
   
@@ -65,7 +66,7 @@ def execute_sql(command, db_commit=False, dictionary=True):
       db_commit: inserting data into the database. 
 
   Returns:
-      if db_commit is False then return the last row id inserted into a db table.
+      if db_commit is True then return the last row id inserted into a db table.
       otherwise return a list of dictionaries corresponding to the db table queried.
   """
   db = get_db()
@@ -79,99 +80,78 @@ def execute_sql(command, db_commit=False, dictionary=True):
 
   return cursor.fetchall()
 
-def validate_hostname_status(hostname_status, http_error_code=404):
-  """Validates hostname status to be 'active' or 'retired'.
+def insert_hostname(hostname):
+  """Inserts hostname to database."""
+  rowid = execute_sql("""
+      INSERT INTO hostnames 
+      (hostname) VALUES ('{}')
+  """.format(hostname), db_commit=True)
+  return rowid
+
+def delete_hostname(hostname=None, hostname_id=None):
+  """Deletes hostnames by setting hostname.retired to true.""" 
+  # to be deleted rows from hostnames table.
+  deleted_rows = []
+
+  if hostname is None and hostname_id is None:
+    # require at least one parameter 
+    return deleted_rows
+
+  if hostname_id is not None:
+    deleted_rows = get_hostnames_by_id(hostname_id) 
+  elif hostname is not None:
+    deleted_rows = get_hostnames(hostname, HOSTNAME_ACTIVE) 
+
+  sql_command = """
+      UPDATE hostnames
+      SET retired = '{}'
+      WHERE retired = '{}'
+  """.format(HOSTNAME_RETIRED, HOSTNAME_ACTIVE)
+
+  if hostname_id is not None:
+    # delete hostname row by id
+    sql_command = """
+        {} AND id = '{}'
+    """.format(sql_command, hostname_id)
+  elif hostname is not None:
+    # delete hostname by name
+    sql_command = """
+      {} AND hostname = '{}'
+    """.format(sql_command, hostname)
+
+  execute_sql(sql_command, db_commit=True)
+
+  return deleted_rows
+
+def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=None, 
+             tests_name=None, tests_runs_status=None, tests_runs_status_id=None, 
+             http_error_code=404):
+  """Validates system variables in the database."""
   
-  Args:
-      hostname_status: binary representation of a hostnmame's status 
-      http_error_code: status code returned if error is encountered.
+  if hostname is not None:
+    validate_hostname(hostname, http_error_code)
 
-  Raises:
-      HTTPException: retiredflag is not valid, raises http_error_code.
-  """
-  errors = {}
-  
-  if not is_active(hostname_status) and not is_retired(hostname_status):
-    errors.update({'hostname_status' : 'Provided hostname status \'{}\' is not valid.'.format(hostname_status)})
+  if hostname_status is not None:
+    validate_hostname_status(hostname_status, http_error_code)
 
-  if errors:
-    abort(http_error_code, message=errors)
+  if retiredflag is not None:
+    validate_retiredflag(retiredflag, http_error_code)
 
-def validate_retiredflag(retiredflag, http_error_code=404):
-  """Validates retiredflag is active '0' or 'retired '1'.
-  
-  Args:
-      retiredflag: binary representation of a hostnmame's status 
-      http_error_code: status code returned if error is encountered.
+  if tests_name is not None:
+    validate_tests_name(tests_name, http_error_code)
 
-  Raises:
-      HTTPException: retiredflag is not valid, raises http_error_code.
-  """
-  errors = {}
+  if tests_runs_status is not None:
+    validate_tests_runs_status(tests_runs_status, http_error_code)
 
-  if not is_active(retiredflag) and not is_retired(retiredflag):
-    errors.update({'retiredflag' : 'Provided flag \'{}\' is not valid.'.format(retiredflag)})
+  if tests_runs_status_id is not None:
+    validate_tests_runs_status_id(tests_runs_status_id, http_error_code)
 
-  if errors:
-    abort(http_error_code, message=errors)
-
-def validate_hostname(hostname, retiredflag, http_error_code=404):
-  """Validates hostname's existence in the database
-  
-  Args:
-      hostname: string that represents a unique system.
-      retiredflag: string that represents a system status.
-      http_error_code: status code returned if error is encountered.
-
-  Raises:
-      HTTPException: hostname does not exist in the database as statusflag, raise http_error_code 
-  """
-  validate_retiredflag(retiredflag)
-  hostname_status = to_hostname_status(retiredflag)
-  errors = {}
-
-  records = execute_sql("""
-      SELECT hostname FROM hostnames 
-      WHERE hostname = '{}' AND retired = '{}'
-   """.format(hostname, retiredflag))
-
-  if not records:
-    # no existing hostname in database
-    errors.update({'hostname' : '{} hostname \'{}\' Not Found.'.format(hostname_status, hostname)})
-  
-  if errors:
-    abort(http_error_code, message=errors)
-
-def validate_tests_name(tests_name, http_error_code=404):
-  """Validates tests.name existence in the database
-  
-  Args:
-      hostname: string that represents a unique system.
-      retiredflag: string that represents a system status.
-      http_error_code: status code returned if error is encountered.
-
-  Raises:
-      HTTPException: hostname does not exist in the database as statusflag, raise http_error_code 
-  """
-  errors = {}
-
-  records = execute_sql("""
-      SELECT * FROM tests 
-      WHERE tests.name = '{}'
-  """.format(tests_name))
-
-  if not records:
-    # no existing tests.name in the database
-    errors.update({'tests_name' : '\'{}\' Not Found.'.format(tests_name)})
-
-  if errors:
-    abort(http_error_code, message=errors)
-
-def validate_status_name(status_name):
-  return
-
-def validate_status_id(status_id):
-  return
+  # validate that hostname exisits as 'retiredflag' or equivalent 'hostname_status'
+  if hostname is not None and retiredflag is not None:
+    validate_hostname(hostname, retiredflag, http_error_code)
+  elif hostname is not None and hostname_status is not None:
+    retiredflag = to_retiredflag(hostname_status)
+    validate_hostname(hostname, retiredflag, http_error_code)
 
 def get_hostnames_table(retiredflag=None):
   """GET all hostnames with the given retiredflag.
@@ -206,7 +186,7 @@ def get_tests_runs_queue(hostname=None):
       AND tests_runs.id = tests_runs_queue.test_runs_id
       AND tests_runs.status = '{}'
       AND hostnames.retired = '{}'
-  """.format(STATUS_SCHEDULED, HOSTNAME_ACTIVE)
+  """.format(STATUS_QUEUED, HOSTNAME_ACTIVE)
 
   if hostname is not None:
     # query for queued tests runs on the given hostname
@@ -219,7 +199,8 @@ def get_tests_runs_queue(hostname=None):
 
   return tests_runs_queue_table
 
-def get_tests_runs_table(hostname=None, status_id=None, status_name=None, tests_name=None):
+def get_tests_runs_table(hostname=None, tests_runs_status_id=None, tests_runs_status=None, 
+                         tests_name=None):
   """Gets tests_runs_table with optional constraint paramters."""
   HOSTNAME_INDEX = 0
   TESTS_NAME_INDEX = 1
@@ -249,20 +230,19 @@ def get_tests_runs_table(hostname=None, status_id=None, status_name=None, tests_
         {} AND hostnames.hostname = '{}'
     """.format(sql_command, hostname)
 
-  if status_id is not None:
+  if tests_runs_status_id is not None:
     # query only tests with given status id
-    validate_status_id(status_id)
+    validate_tests_runs_status_id(tests_runs_status_id)
     sql_command = """
         {} AND statuses.id = '{}'
-    """.format(sql_command, status_id)
+    """.format(sql_command, tests_runs_status_id)
 
-  if status_name is not None:
+  if tests_runs_status is not None:
     # only query tests with given status name
-    status_name = status_name.upper()
-    validate_status_name(status_name)
+    validate_tests_runs_status(tests_runs_status)
     sql_command = """
         {} AND statuses.name = '{}'
-    """.format(sql_command, status_name)
+    """.format(sql_command, tests_runs_status)
 
   if tests_name is not None:
     # query only for tests with the given tests name
@@ -291,8 +271,8 @@ def get_tests_runs_table(hostname=None, status_id=None, status_name=None, tests_
   
     tests_runs_table.append({
         'hostname' : data[HOSTNAME_INDEX],
-        'tests_name' : data[TESTS_NAME_INDEX],
-        'statuses_name' : data[STATUSES_INDEX],
+        'test' : data[TESTS_NAME_INDEX],
+        'status' : data[STATUSES_INDEX],
         'start_timestamp' : start_timestamp,
         'end_timestamp' : end_timestamp,
         'notes' : data[NOTES_INDEX],
@@ -302,73 +282,6 @@ def get_tests_runs_table(hostname=None, status_id=None, status_name=None, tests_
     })
 
   return tests_runs_table
-
-def get_running_tests(hostname=None):
-  """GET currently running tests_runs on given hostname.
-
-    Args:
-        hostname: system hostname if none query as wildcard.
-  """
-  HOSTNAME_INDEX = 0
-  TESTS_NAME_INDEX = 1
-  STATUSES_INDEX = 2
-  START_TIMESTAMP_INDEX = 3
-  END_TIMESTAMP_INDEX = 4
-  NOTES_INDEX = 5
-  CONFIG_INDEX = 6
-  SCRATCH_INDEX = 7
-
-  # query for all running tests
-  sql_command = """
-      SELECT hostnames.hostname, tests.name, statuses.name, tests_runs.start_timestamp, 
-          tests_runs.end_timestamp, tests_runs.notes, tests_runs.config, tests_runs.scratch
-      FROM hostnames, tests, tests_runs, statuses
-      WHERE tests_runs.end_timestamp = '{}'
-      AND hostnames.id = tests_runs.hostnames_id 
-      AND tests.id = tests_runs.tests_id
-      AND statuses.id = tests_runs.status
-      AND tests_runs.status = '{}'
-      AND hostnames.retired = '{}'
-  """.format(NULL_TIMESTAMP, STATUS_RUNNING, HOSTNAME_ACTIVE)
-  
-  if hostname is not None:
-    # query only running tests on given hostname
-    validate_hostname(hostname, HOSTNAME_ACTIVE)
-    sql_command = """
-       {} AND hostnames.hostname = '{}'
-    """.format(sql_command, hostname)
-
-  # get raw data (reason: key naming collision with tests.name and statuses.name)
-  records = execute_sql(sql_command, dictionary=False)
-
-  if not records:
-    # no running tests
-    return {}
-
-  data = records[0]
-
-  # datetime.datetime is not json serializable
-  start_timestamp = str(data[START_TIMESTAMP_INDEX])
-  end_timestamp = str(data[END_TIMESTAMP_INDEX])
-
-  # follow consistency in representation of null objects
-  if data[START_TIMESTAMP_INDEX] is None:
-    start_timestamp = None
-  if data[END_TIMESTAMP_INDEX] is None:
-    end_timestamp = None
-  
-  running_tests = {
-      'hostname' : data[HOSTNAME_INDEX],
-      'tests_name' : data[TESTS_NAME_INDEX],
-      'statuses_name' : data[STATUSES_INDEX],
-      'start_timestamp' : start_timestamp,
-      'end_timestamp' : end_timestamp,
-      'notes' : data[NOTES_INDEX],
-      'config' : data[CONFIG_INDEX],
-      'scratch' : data[SCRATCH_INDEX]
-  }
-
-  return running_tests
 
 def get_hostnames(hostname, retiredflag=None):
   """Gets hostname rows by hostname and with an optional retiredflag constraint."""
@@ -426,3 +339,153 @@ def to_hostname_status(retiredflag):
     return HOSTNAME_STATUS_RETIRED
 
   return HOSTNAME_STATUS_ACTIVE
+
+def validate_hostname(hostname, retiredflag=None, http_error_code=404):
+  """Validates hostname's existence in the database
+  
+  Args:
+      hostname: string that represents a unique system.
+      retiredflag: string that represents a system status.
+      http_error_code: status code returned if error is encountered.
+
+  Raises:
+      HTTPException: hostname does not exist in the database as statusflag, raise http_error_code 
+  """
+  hostname_status = 'both {} and {}'.format(HOSTNAME_STATUS_ACTIVE, HOSTNAME_STATUS_RETIRED)
+  errors = {}
+
+  sql_command = """
+      SELECT hostname FROM hostnames 
+      WHERE hostname = '{}' 
+  """.format(hostname)
+   
+  if retiredflag is not None:
+    # query hostnames with the retiredflag constraint
+    validate_retiredflag(retiredflag)
+    hostname_status = to_hostname_status(retiredflag)
+    sql_command = """
+    {} AND retired = '{}'
+    """.format(sql_command, retiredflag)
+
+  records = execute_sql(sql_command)
+
+  if not records:
+    # no existing hostname in the database
+    errors.update({
+        'hostname' : '\'{}\' Not Found. Queried {} hostnames.'.format(hostname, hostname_status)
+    })
+  
+  if errors:
+    abort(http_error_code, message=errors)
+
+def validate_hostname_status(hostname_status, http_error_code=404):
+  """Validates hostname status to be 'active' or 'retired'.
+  
+  Args:
+      hostname_status: binary representation of a hostnmame's status 
+      http_error_code: status code returned if error is encountered.
+
+  Raises:
+      HTTPException: retiredflag is not valid, raises http_error_code.
+  """
+  errors = {}
+  
+  if not is_active(hostname_status) and not is_retired(hostname_status):
+    errors.update({'hostname_status' : 'Provided hostname status \'{}\' is not valid.'.format(hostname_status)})
+
+  if errors:
+    abort(http_error_code, message=errors)
+
+
+
+def validate_retiredflag(retiredflag, http_error_code=404):
+  """Validates retiredflag is active '0' or 'retired '1'.
+  
+  Args:
+      retiredflag: binary representation of a hostnmame's status 
+      http_error_code: status code returned if error is encountered.
+
+  Raises:
+      HTTPException: retiredflag is not valid, raises http_error_code.
+  """
+  errors = {}
+
+  if not is_active(retiredflag) and not is_retired(retiredflag):
+    errors.update({'retiredflag' : 'Provided flag \'{}\' is not valid.'.format(retiredflag)})
+
+  if errors:
+    abort(http_error_code, message=errors)
+
+
+
+def validate_tests_name(tests_name, http_error_code=404):
+  """Validates tests.name existence in the database
+  
+  Args:
+      tests_name: unique stirng identifier of a system test.
+      http_error_code: status code returned if error is encountered.
+
+  Raises:
+      HTTPException: hostname does not exist in the database as statusflag, raise http_error_code 
+  """
+  errors = {}
+
+  records = execute_sql("""
+      SELECT * FROM tests 
+      WHERE tests.name = '{}'
+  """.format(tests_name))
+
+  if not records:
+    # no existing tests.name in the database
+    errors.update({'tests_name' : '\'{}\' Not Found.'.format(tests_name)})
+
+  if errors:
+    abort(http_error_code, message=errors)
+
+def validate_tests_runs_status(tests_runs_status, http_error_code=404):
+  """Validates tests_runs status existence in the database.
+  
+  Args:
+      tests_runs_status: representation of final outcome of a test run.
+      http_error_code: status code returned if error is encountered.
+
+  Raises:
+      HTTPException: hostname does not exist in the database as statusflag, raise http_error_code 
+  """
+  errors = {}
+
+  records = execute_sql("""
+      SELECT * FROM statuses
+      WHERE statuses.name = '{}'
+  """.format(tests_runs_status))
+
+  if not records:
+    # provided tests runs status does not exist
+    errors.update({'tests_runs_status' : 'status \'{}\' Not Found.'.format(tests_runs_status)})
+    
+  if errors:
+    abort(http_error_code, message=errors)
+
+def validate_tests_runs_status_by_id(tests_runs_status_id, http_error_code=404):
+  """Validates tests_runs_status id existence in the database.
+  
+  Args:
+      tests_runs_status_id: sql table id for table tests_runs.
+      http_error_code: status code returned if error is encountered.
+
+  Raises:
+      HTTPException: hostname does not exist in the database as statusflag, raise http_error_code 
+  """
+  errors = {}
+  
+  records = execute_sql("""
+      SELECT * FROM statuses
+      WHERE statuses.id = '{}'
+  """.format(tests_runs_status_id))
+
+  if not records:
+    # invalid status id provided
+    errors.update({'tests_runs_status_id', 'status id \'{}\' Not Found.'.format(tests_runs_status_id)})
+
+  if errors:
+    abort(http_error_code, message=errors)
