@@ -1,4 +1,4 @@
-from .test import Test
+from .testHistory import TestHistory
 from api.db import (
     execute_sql,
     validate_hostname_status,
@@ -51,4 +51,4 @@ class Hostname(Resource):
     # register hostname as an api resource
     api.add_resource(Hostname, path)
     # directly add sub-resources of hostname
-    Test.add_all_resources(api, '{}/test'.format(path))
+    TestHistory.add_all_resources(api, '{}/history'.format(path))

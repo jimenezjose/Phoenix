@@ -125,11 +125,11 @@ def delete_hostname(hostname=None, hostname_id=None):
 
 def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=None, 
              tests_name=None, tests_runs_status=None, tests_runs_status_id=None, 
-             http_error_code=404):
+             table_name=None, http_error_code=404):
   """Validates system variables in the database."""
   
   if hostname is not None:
-    validate_hostname(hostname, http_error_code)
+    validate_hostname(hostname, None, http_error_code)
 
   if hostname_status is not None:
     validate_hostname_status(hostname_status, http_error_code)
@@ -146,12 +146,51 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
   if tests_runs_status_id is not None:
     validate_tests_runs_status_id(tests_runs_status_id, http_error_code)
 
+  if table_name is not None:
+    validate_table_name(table_name, http_error_code)
+
   # validate that hostname exisits as 'retiredflag' or equivalent 'hostname_status'
   if hostname is not None and retiredflag is not None:
     validate_hostname(hostname, retiredflag, http_error_code)
   elif hostname is not None and hostname_status is not None:
     retiredflag = to_retiredflag(hostname_status)
     validate_hostname(hostname, retiredflag, http_error_code)
+
+def get_table_fields(table_name):
+  validate(table_name=table_name)
+  records = execute_sql('DESCRIBE `{}`'.format(table_name))
+
+  table_fields = []
+  for data in records:
+    table_fields.append(data['Field'])
+
+  return table_fields
+
+def get_table(table_name, hostname=None, retiredflag=None, tests_runs_status_id=None, 
+              tests_runs_status=None, tests_name=None, filter=None):
+  """Gets table content with optional constraint paramters."""
+  validate(table_name=table_name)
+  table_names_list = get_table_names_list()
+  table = []
+
+  if table_name is 'hostnames':
+    table = get_hostnames_table(retiredflag)
+
+  elif table_name is 'tests_runs':
+    table = get_tests_runs_table(hostname, tests_runs_status_id, tests_runs_status, tests_name)
+
+  elif table_name is 'tests_runs_queue':
+    table = get_tests_runs_queue(hostname)
+
+  elif table_name in table_names_list:
+    table = execute_sql('SELECT * FROM `{}`'.format(table_name))
+  
+  return table
+
+def get_table_names_list():
+  table_names_list = execute_sql('SHOW TABLES')
+  return table_names_list
+
 
 def get_hostnames_table(retiredflag=None):
   """GET all hostnames with the given retiredflag.
@@ -320,26 +359,6 @@ def get_hostname_by_id(id):
 
   return hostname_row
 
-def is_retired(flag):
-  return flag == HOSTNAME_RETIRED or flag == HOSTNAME_STATUS_RETIRED
-
-def is_active(flag):
-  return flag == HOSTNAME_ACTIVE or flag == HOSTNAME_STATUS_ACTIVE
-
-def to_retiredflag(hostname_status):
-  """Convers hostnames_status to an equivalent retiredflag string"""
-  if is_retired(hostname_status):
-    return HOSTNAME_RETIRED
-
-  return HOSTNAME_ACTIVE
-
-def to_hostname_status(retiredflag):
-  """Converts retiredflag to a hostname status strings {'active', 'retired'}"""
-  if is_retired(retiredflag):
-    return HOSTNAME_STATUS_RETIRED
-
-  return HOSTNAME_STATUS_ACTIVE
-
 def validate_hostname(hostname, retiredflag=None, http_error_code=404):
   """Validates hostname's existence in the database
   
@@ -364,16 +383,15 @@ def validate_hostname(hostname, retiredflag=None, http_error_code=404):
     validate_retiredflag(retiredflag)
     hostname_status = to_hostname_status(retiredflag)
     sql_command = """
-    {} AND retired = '{}'
+        {} AND retired = '{}'
     """.format(sql_command, retiredflag)
 
   records = execute_sql(sql_command)
 
   if not records:
     # no existing hostname in the database
-    errors.update({
-        'hostname' : '\'{}\' Not Found. Queried {} hostnames.'.format(hostname, hostname_status)
-    })
+    error_msg = '\'{}\' Not Found. Queried {} hostnames.'.format(hostname, hostname_status)
+    errors.update({'hostname' : error_msg})
   
   if errors:
     abort(http_error_code, message=errors)
@@ -391,12 +409,11 @@ def validate_hostname_status(hostname_status, http_error_code=404):
   errors = {}
   
   if not is_active(hostname_status) and not is_retired(hostname_status):
-    errors.update({'hostname_status' : 'Provided hostname status \'{}\' is not valid.'.format(hostname_status)})
+    error_msg = '\'{}\' Not Found.'.format(hostname_status)
+    errors.update({'hostname_status' : error_msg})
 
   if errors:
     abort(http_error_code, message=errors)
-
-
 
 def validate_retiredflag(retiredflag, http_error_code=404):
   """Validates retiredflag is active '0' or 'retired '1'.
@@ -411,12 +428,11 @@ def validate_retiredflag(retiredflag, http_error_code=404):
   errors = {}
 
   if not is_active(retiredflag) and not is_retired(retiredflag):
-    errors.update({'retiredflag' : 'Provided flag \'{}\' is not valid.'.format(retiredflag)})
+    error_msg = '\'{}\' Not Found.'.format(retiredflag)
+    errors.update({'retiredflag' : error_msg})
 
   if errors:
     abort(http_error_code, message=errors)
-
-
 
 def validate_tests_name(tests_name, http_error_code=404):
   """Validates tests.name existence in the database
@@ -437,7 +453,8 @@ def validate_tests_name(tests_name, http_error_code=404):
 
   if not records:
     # no existing tests.name in the database
-    errors.update({'tests_name' : '\'{}\' Not Found.'.format(tests_name)})
+    error_msg = '\'{}\' Not Found.'.format(tests_name)
+    errors.update({'tests_name' : error_msg}) 
 
   if errors:
     abort(http_error_code, message=errors)
@@ -461,23 +478,16 @@ def validate_tests_runs_status(tests_runs_status, http_error_code=404):
 
   if not records:
     # provided tests runs status does not exist
-    errors.update({'tests_runs_status' : 'status \'{}\' Not Found.'.format(tests_runs_status)})
+    error_msg = '\'{}\' Not Found.'.format(tests_runs_status)
+    errors.update({'tests_runs_status' : '\'{}\' Not Found.'.format(tests_runs_status)})
     
   if errors:
     abort(http_error_code, message=errors)
 
 def validate_tests_runs_status_by_id(tests_runs_status_id, http_error_code=404):
-  """Validates tests_runs_status id existence in the database.
-  
-  Args:
-      tests_runs_status_id: sql table id for table tests_runs.
-      http_error_code: status code returned if error is encountered.
-
-  Raises:
-      HTTPException: hostname does not exist in the database as statusflag, raise http_error_code 
-  """
+  """Validates tests_runs_status id existence in the database."""
   errors = {}
-  
+
   records = execute_sql("""
       SELECT * FROM statuses
       WHERE statuses.id = '{}'
@@ -485,7 +495,44 @@ def validate_tests_runs_status_by_id(tests_runs_status_id, http_error_code=404):
 
   if not records:
     # invalid status id provided
-    errors.update({'tests_runs_status_id', 'status id \'{}\' Not Found.'.format(tests_runs_status_id)})
+    error_msg = '\'{}\' Not Found.'.format(tests_runs_status_id)
+    errors.update({'tests_runs_status_id', error_msg}) 
 
   if errors:
     abort(http_error_code, message=errors)
+
+def validate_table_name(table_name, htpp_error_code=404):
+  """Validates that table name exists in database."""
+  errors = {}
+
+  records = execute_sql("""
+      SHOW TABLES LIKE '{}'
+  """.format(table_name))
+
+  if not records:
+    # invalid table name
+    error_msg = '\'{}\' Not Found.'.format(table_name)
+    errors.update({'table_name' : error_msg})
+
+  if errors:
+    abort(http_error_code, message=errors)
+
+def is_retired(flag):
+  return flag == HOSTNAME_RETIRED or flag == HOSTNAME_STATUS_RETIRED
+
+def is_active(flag):
+  return flag == HOSTNAME_ACTIVE or flag == HOSTNAME_STATUS_ACTIVE
+
+def to_retiredflag(hostname_status):
+  """Convers hostnames_status to an equivalent retiredflag string"""
+  if is_retired(hostname_status):
+    return HOSTNAME_RETIRED
+
+  return HOSTNAME_ACTIVE
+
+def to_hostname_status(retiredflag):
+  """Converts retiredflag to a hostname status strings {'active', 'retired'}"""
+  if is_retired(retiredflag):
+    return HOSTNAME_STATUS_RETIRED
+
+  return HOSTNAME_STATUS_ACTIVE
