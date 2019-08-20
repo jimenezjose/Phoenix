@@ -1,4 +1,3 @@
-from .testsrunsStatus import TestsrunsStatus
 from api.db import (
     get_table,
     get_table_fields,
@@ -47,5 +46,3 @@ class TestHistory(Resource):
     """
     # register tests as an api resource with the given path
     api.add_resource(TestHistory, path)
-    # add a new end-point for querying specific statused tests_runs
-    TestsrunsStatus.add_all_resources(api, '{}/<string:tests_runs_status>'.format(path))

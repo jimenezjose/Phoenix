@@ -161,8 +161,8 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
     validate_hostname(hostname, retiredflag, http_error_code)
 
 def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None, 
-              tests_runs_status_id=None, tests_runs_status=None, tests_name=None, constraints={}, 
-              raw=False):
+              tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None, 
+              constraints={}, raw=False):
   """Gets table content with optional constraint paramters.
   
   Args:
@@ -172,72 +172,117 @@ def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None,
                               }
     raw: get raw table as represented in the db schema.
   """
-  validate(table_name=table_name)
-  filter = get_empty_table_entry(table_name)
+  filter = get_empty_database_schema()
   table = []
 
-  # zip contraint params to similar dictionary structure as 'constraints'
+  # zip contraint params to similar dictionary structure as db schema
   params = zip_params(
     hostname=hostname,
     hostname_status=hostname_status,
     retiredflag=retiredflag,
     tests_runs_status_id=tests_runs_status_id,
-    tests_runs_status=tests_runs_status,
+    tests_runs_status_name=tests_runs_status_name,
     tests_name=tests_name,
   )
 
-  if table_name in constraints:
-    filter.update(constraints[table_name])
+  # merge constraints to filter
+  for table in constraints:
+    for field, value in params[table].items():
+      if value is not None:
+        filter[table].update({field : value})
 
-  if table_name in params:
-    filter.update(params[table_name])
+  # merge param constraints to filter
+  for table in params:
+    for field, value in params[table].items():
+      if value is not None:
+        filter[table].update({field : value})
 
   if table_name is 'hostnames' and not raw:
-    table = get_hostnames_table(hostname, retiredflag, hostname_status)
+    table = get_hostnames_table(filter)
   elif table_name is 'tests_runs' and not raw:
-    table = get_tests_runs_table(hostname, tests_runs_status_id, tests_runs_status, tests_name)
+    table = get_tests_runs_table(filter)
   elif table_name is 'tests_runs_queue' and not raw:
-    table = get_tests_runs_queue(hostname)
+    table = get_tests_runs_queue(filter)
   else:
-    table = get_raw_table(table_name, constraints)
+    table = get_raw_table(table_name, filter)
 
   return table
 
-def get_raw_table(table_name, constraints={})
+def zip_params(hostname=None, hostname_status=None, retiredflag=None,
+              tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None):
+  """Encapsulates common api paramters to an organized dictionary.
+  Example:
+     `hostnames` table:
+          +----+----------+---------+
+          | id | hostname | retired |
+          +----+----------+---------+
+          | 4  |  sfo-aag |  false  |
+          +----+----------+---------+
+                    ...
+
+      params passed: 
+          hostname='sfo-aag', hostname_status='active'
+
+      example returns: {'hostnames' : {'hostname' : 'sfo-aad', 'retired' : 'false', 'id' : None}}
+  """
+  if hostname_status:
+    # convert to retiredflag and overwrite retiredflag param
+    retiredflag = to_retiredflag(hostname_status)
+
+  # empty schema structure of database
+  params = get_empty_database_schema(['hostnames', 'tests_runs', 'statuses', 'tests'])
+
+  # populate hostnames table
+  params['hostnames'].update({
+      'hostname' : hostname,
+      'retired' : retiredflag,
+  })
+
+  # populate tests_runs table 
+  params['tests_runs'].update({
+      'status' : tests_runs_status_id,
+  })
+
+  # populate statuses table
+  params['statuses'].update({
+      'id' : tests_runs_status_id,
+      'name' : tests_runs_status_name
+  })
+
+  # populate tests table
+  params['tests'].update({
+      'name' : tests_name
+  })
+
+  return params
+
+def get_raw_table(table_name, constraints={}):
   """Gets raw filtered data from table_name."""
-  filter = get_empty_table_entry(table_name)
   table = []
 
-  if table_name in constraints:
-    filter.update(constraints[table_name])
-
-  sql_command = """
-      SELECT * FROM {}
-      WHERE id > 0
-  """.format(table_name)
-
-  table_fields = get_table_fields(table_name)
-  errors = {}
-
-  for field, value in filter.items():
-    # filter query
-    if field in table_fields:
-      # qualified field
-      if value is not None:
-        sql_command = """
-            {} AND {} = {}
-        """.format(sql_command, field, value)
-    else:
-      errors.update({field : 'unqualified field in raw table {}'.format(table_name)})
-
-  if errors:
-    # Conflict error for unrecognized constraints
-    abort(409, message=errors)
+  sql_command = 'SELECT * FROM {}'.format(table_name)
+  # filter constraint parameters into query
+  authorized_tables = [table_name]
+  sql_command = append_sql_constraints(sql_command, constraints, authorized_tables)
 
   table = execute_sql(sql_command)
-
   return table
 
+def get_empty_database_schema(table_restrictions=[]):
+  """Structured dictionary that reflects the database schema."""
+  if not table_restrictions:
+    # no table restriction 
+    table_restrictions = get_table_names_list()
+
+  schema = {}
+  # construct empty skeleton structure of database
+  for table_name in get_table_names_list():
+    if table_name in table_restrictions:
+      schema.update({table_name : {}})
+      for field in get_table_fields(table_name):
+        schema[table_name].update({field : None})
+
+  return schema
 
 def get_empty_table_entry(table_name):
   """Gets dictionary of table keys without values."""
@@ -270,37 +315,21 @@ def get_table_names_list():
   
   return table_names_list
 
-def get_hostnames_table(hostname=None, retiredflag=None, hostname_status=None):
+def get_hostnames_table(constraints={}):
   """GET all hostnames with the given retiredflag or equivalent hostname status."""
   sql_command = """
       SELECT id, hostname, retired
       FROM hostnames
-      WHERE id > 0
   """
-
-  if hostname is not None:
-    # filter results by hostname
-    sql_command = """
-        {} AND hostname = '{}'
-    """.format(sql_command, hostname)
-
-  if retiredflag is not None:
-    # query hostnames only with the given retiredflag 
-    sql_command = """
-        {} AND retired = '{}'
-    """.format(sql_command, retiredflag)
-  elif hostname_status is not None:
-    # convert hostname status to equivalent retiredflag and filter hostnames
-    retiredflag = to_retiredflag(hostname_status)
-    sql_command = """
-        {} AND retired = '{}'
-    """.format(sql_command, retiredflag)
+  # restrict query on given constraints
+  authorized_tables = ['hostnames']
+  sql_command = append_sql_constraints(sql_command, constraints, authorized_tables)
 
   hostnames_table = execute_sql(sql_command)
 
   return hostnames_table
 
-def get_tests_runs_queue(hostname=None):
+def get_tests_runs_queue(constraints={}):
   """GET tests_runs_queue with optional constraint parameter - hostname."""
   # query for all tests runs in the queue
   sql_command =  """
@@ -312,19 +341,39 @@ def get_tests_runs_queue(hostname=None):
       AND hostnames.retired = '{}'
   """.format(STATUS_QUEUED, HOSTNAME_ACTIVE)
 
-  if hostname is not None:
-    # query for queued tests runs on the given hostname
-    #validate_hostname(hostname, HOSTNAME_ACTIVE)
-    sql_command = """
-        {} AND hostnames.hostname = '{}'
-    """.format(sql_command, hostname)
+  # restrict query on constraints
+  authorized_tables = ['hostnames', 'tests_runs', 'tests_runs_queue']
+  sql_command = append_sql_constraints(sql_command, constraints, authorized_tables)
 
-  tests_runs_queue_table = execute_sql(sql_command)
+  tests_runs_queue = execute_sql(sql_command)
 
-  return tests_runs_queue_table
+  return tests_runs_queue
 
-def get_tests_runs_table(hostname=None, tests_runs_status_id=None, tests_runs_status=None, 
-                         tests_name=None):
+def append_sql_constraints(sql_command, constraints={}, authorized_tables=[]):
+  """appends sql conditions according to the constraints paramter.
+
+  Args:
+      sql_command: mysql command string that *must* contain the WHERE clause.
+  """
+
+  if ' WHERE ' not in sql_command:
+    # append dummy where clause
+    sql_command = '{} WHERE TRUE'.format(sql_command)
+
+  for table in constraints:
+    if table not in authorized_tables:
+      continue
+    for field, value in constraints[table].items():
+      if field in get_table_fields(table) and value is not None:
+        sql_command = """
+            {} AND {}.{} = '{}'
+        """.format(sql_command, table, field, value)
+
+  return sql_command
+
+      
+
+def get_tests_runs_table(constraints={}):
   """Gets tests_runs_table with optional constraint paramters."""
   HOSTNAME_INDEX = 0
   TESTS_NAME_INDEX = 1
@@ -346,34 +395,10 @@ def get_tests_runs_table(hostname=None, tests_runs_status_id=None, tests_runs_st
       AND tests.id = tests_runs.tests_id
       AND statuses.id = tests_runs.status
   """
-  
-  if hostname is not None:
-    # query only tests under given hostname
-    #validate_hostname(hostname, HOSTNAME_ACTIVE)
-    sql_command = """
-        {} AND hostnames.hostname = '{}'
-    """.format(sql_command, hostname)
 
-  if tests_runs_status_id is not None:
-    # query only tests with given status id
-    #validate_tests_runs_status_id(tests_runs_status_id)
-    sql_command = """
-        {} AND statuses.id = '{}'
-    """.format(sql_command, tests_runs_status_id)
-
-  if tests_runs_status is not None:
-    # only query tests with given status name
-    #validate_tests_runs_status(tests_runs_status)
-    sql_command = """
-        {} AND statuses.name = '{}'
-    """.format(sql_command, tests_runs_status)
-
-  if tests_name is not None:
-    # query only for tests with the given tests name
-    #validate_tests_name(tests_name)
-    sql_command = """
-        {} AND tests.name = '{}'
-    """.format(sql_command, tests_name)
+  # append filter conditions
+  authorized_tables = ['hostnames', 'tests', 'tests_runs', 'statuses']
+  sql_command = append_sql_constraints(sql_command, constraints, authorized_tables)
 
   # get raw data (reason: key naming collision with tests.name and statuses.name)
   records = execute_sql(sql_command, dictionary=False)
