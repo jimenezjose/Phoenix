@@ -1,8 +1,6 @@
 from .testsrunsStatus import TestsrunsStatus
 from api.db import (
-    execute_sql,
-    get_tests_runs_table,
-    get_tests_runs_queue,
+    get_table,
     get_table_fields,
     validate)
 
@@ -34,12 +32,10 @@ class TestHistory(Resource):
     args = parser.parse_args()
 
     # query for currently running tests
-    #tests_runs = get_tests_runs_table(hostname, filter=args)
-    tests_runs = get_tests_runs_table(hostname)
+    tests_runs = get_table('tests_runs', filter=args)
+    return args
 
-    tests_records = {'tests_runs' : tests_runs}
-
-    return tests_records
+    return {'tests_runs' : tests_runs}
 
   @staticmethod  
   def add_all_resources(api, path):

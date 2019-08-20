@@ -11,7 +11,9 @@ from api.db import (
     get_hostnames,
     get_hostname_by_id,
     validate,
+    get_table,
     delete_hostname,
+    insert_hostname,
     is_retired,
     to_retiredflag)
 
@@ -35,17 +37,19 @@ class HostnameStatus(Resource):
             * (status provided unknown) - not {active, retired}
                 Status Code: 404 Not Found
     """
-    validate_hostname_status(hostname_status)
-    retiredflag = to_retiredflag(hostname_status) 
+    validate(hostname_status=hostname_status)
 
-    # Get all hostnames with 'retiredflag'
-    hostnames_table = get_hostnames_table(retiredflag)
+    # Get all hostnames with given retired hostname status
+    hostnames_table = get_table('hostnames', hostname_status=hostname_status)
 
     return {'hostnames' : hostnames_table}, 200
 
   def post(self, hostname_status):
     """POST request to add a hostname to the database.
     
+    Args:
+        hostname_status: string annotation of a system for a binary representation of an 'active' 
+
     Returns:
         Success: 
             * (hostname inserted into the database)
@@ -61,34 +65,28 @@ class HostnameStatus(Resource):
             * (duplicate insertion for active hostname not allowed) 
                 Status Code: 409 Conflict
     """
-    parser = reqparse.RequestParser()
-    validate_hostname_status(hostname_status)
-    retiredflag = to_retiredflag(hostname_status)
-    
+    validate(hostname_status=hostname_status)
+
     # require 'hostname' parameter from request. 
+    parser = reqparse.RequestParser()
     parser.add_argument('hostname', required=True)
     args = parser.parse_args()
 
-    if is_retired(retiredflag):
+    if is_retired(hostname_status):
       # Hostnames added to the database must be active, return status code 405 Method Not Allowed
       return {'message' : 'The method is not allowed for the requested URL.'}, 405
 
     # check if working hostname already exists in db.
-    existing_hostname = get_hostnames(args['hostname'], retiredflag)
+    existing_hostname = get_table('hostnames', hostname=args['hostname'], hostname_status=hostname_status) 
 
     if existing_hostname:
       # active hostname already exists, returning conflict status code 409.
       return {'message' : '{} hostname, {}, already exists. Insertion not allowed.'.format(hostname_status, args['hostname'])}, 409
 
     # otherwise, insert hostname into db.
-    rowid = execute_sql("""
-        INSERT INTO hostnames 
-        (hostname) VALUES ('{}')
-    """.format(args['hostname']), db_commit=True)
+    inserted_hostname = insert_hostname(args['hostname'])
 
-    inserted_row = get_hostname_by_id(rowid)
-
-    return inserted_row
+    return inserted_hostname
 
   def delete(self, hostname_status):
     """DELETE the hostname by setting the retired flag to True."""

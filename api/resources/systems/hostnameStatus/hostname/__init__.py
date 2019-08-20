@@ -1,10 +1,7 @@
 from .testHistory import TestHistory
 from api.db import (
-    execute_sql,
-    validate_hostname_status,
-    validate_hostname,
-    get_hostnames,
-    to_retiredflag)
+    validate,
+    get_table)
 
 from flask_restful import Resource
 
@@ -27,18 +24,11 @@ class Hostname(Resource):
             * (hostname did not exist in the database)
                 Status Code: 404 Not Found
     """
-    validate_hostname_status(hostname_status)
-    retiredflag = to_retiredflag(hostname_status)
-    validate_hostname(hostname, retiredflag)
-
+    validate(hostname=hostname, hostname_status=hostname_status)    
     # query for hostname information
-    hostnames_list = get_hostnames(hostname, retiredflag)
+    hostnames_list = get_table('hostnames', hostname=hostname, hostname_status=hostname_status)
 
-    return {'hostnames' : hostnames_list} 
-
-    return hostname_info
-
-    return {'message' : 'Info on {} {} with id: {}'.format(hostname_status, hostname, records)}, 200
+    return {'hostnames' : hostnames_list}, 200
 
   @staticmethod  
   def add_all_resources(api, path):

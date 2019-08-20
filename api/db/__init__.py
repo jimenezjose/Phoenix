@@ -3,6 +3,8 @@
 # single valide function with optional params
 # look up by tests_name
 # validate arguments from JSON body given 400 error not 404. this is not a db problem rather and route handling prob.
+from api.db import utils
+
 import mysql.connector
 import click
 from flask import current_app, g
@@ -86,7 +88,9 @@ def insert_hostname(hostname):
       INSERT INTO hostnames 
       (hostname) VALUES ('{}')
   """.format(hostname), db_commit=True)
-  return rowid
+
+  inserted_row = get_hostname_by_id(rowid)
+  return inserted_row
 
 def delete_hostname(hostname=None, hostname_id=None):
   """Deletes hostnames by setting hostname.retired to true.""" 
@@ -156,8 +160,97 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
     retiredflag = to_retiredflag(hostname_status)
     validate_hostname(hostname, retiredflag, http_error_code)
 
-def get_table_fields(table_name):
+def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None, 
+              tests_runs_status_id=None, tests_runs_status=None, tests_name=None, constraints={}, 
+              raw=False):
+  """Gets table content with optional constraint paramters.
+  
+  Args:
+    constraints: dictionary with key of table name then values of constraint parameters.
+            Example: constraints = {
+                                   'tests_runs' : {'id' : 2}
+                              }
+    raw: get raw table as represented in the db schema.
+  """
   validate(table_name=table_name)
+  filter = get_empty_table_entry(table_name)
+  table = []
+
+  # zip contraint params to similar dictionary structure as 'constraints'
+  params = zip_params(
+    hostname=hostname,
+    hostname_status=hostname_status,
+    retiredflag=retiredflag,
+    tests_runs_status_id=tests_runs_status_id,
+    tests_runs_status=tests_runs_status,
+    tests_name=tests_name,
+  )
+
+  if table_name in constraints:
+    filter.update(constraints[table_name])
+
+  if table_name in params:
+    filter.update(params[table_name])
+
+  if table_name is 'hostnames' and not raw:
+    table = get_hostnames_table(hostname, retiredflag, hostname_status)
+  elif table_name is 'tests_runs' and not raw:
+    table = get_tests_runs_table(hostname, tests_runs_status_id, tests_runs_status, tests_name)
+  elif table_name is 'tests_runs_queue' and not raw:
+    table = get_tests_runs_queue(hostname)
+  else:
+    table = get_raw_table(table_name, constraints)
+
+  return table
+
+def get_raw_table(table_name, constraints={})
+  """Gets raw filtered data from table_name."""
+  filter = get_empty_table_entry(table_name)
+  table = []
+
+  if table_name in constraints:
+    filter.update(constraints[table_name])
+
+  sql_command = """
+      SELECT * FROM {}
+      WHERE id > 0
+  """.format(table_name)
+
+  table_fields = get_table_fields(table_name)
+  errors = {}
+
+  for field, value in filter.items():
+    # filter query
+    if field in table_fields:
+      # qualified field
+      if value is not None:
+        sql_command = """
+            {} AND {} = {}
+        """.format(sql_command, field, value)
+    else:
+      errors.update({field : 'unqualified field in raw table {}'.format(table_name)})
+
+  if errors:
+    # Conflict error for unrecognized constraints
+    abort(409, message=errors)
+
+  table = execute_sql(sql_command)
+
+  return table
+
+
+def get_empty_table_entry(table_name):
+  """Gets dictionary of table keys without values."""
+  entry = {}
+  fields = get_table_fields(table_name)
+
+  for field in fields:
+    entry.update({field, None})
+   
+  return entry 
+
+def get_table_fields(table_name):
+  """Gets a list of table field names."""
   records = execute_sql('DESCRIBE `{}`'.format(table_name))
 
   table_fields = []
@@ -166,49 +259,41 @@ def get_table_fields(table_name):
 
   return table_fields
 
-def get_table(table_name, hostname=None, retiredflag=None, tests_runs_status_id=None, 
-              tests_runs_status=None, tests_name=None, filter=None):
-  """Gets table content with optional constraint paramters."""
-  validate(table_name=table_name)
-  table_names_list = get_table_names_list()
-  table = []
-
-  if table_name is 'hostnames':
-    table = get_hostnames_table(retiredflag)
-
-  elif table_name is 'tests_runs':
-    table = get_tests_runs_table(hostname, tests_runs_status_id, tests_runs_status, tests_name)
-
-  elif table_name is 'tests_runs_queue':
-    table = get_tests_runs_queue(hostname)
-
-  elif table_name in table_names_list:
-    table = execute_sql('SELECT * FROM `{}`'.format(table_name))
-  
-  return table
-
 def get_table_names_list():
-  table_names_list = execute_sql('SHOW TABLES')
+  """Gets list of tables existent in database."""
+  records = execute_sql('SHOW TABLES', dictionary=False)
+
+  table_names_list = []
+  for data in records:
+    name = data[0]
+    table_names_list.append(name)
+  
   return table_names_list
 
-
-def get_hostnames_table(retiredflag=None):
-  """GET all hostnames with the given retiredflag.
-  
-  Args:
-      retiredflag: Optional argument that represents if the systems is retired or active. 
-                   If retired is not passed in function call, retiredflag will act as a wildcard.
-  """
+def get_hostnames_table(hostname=None, retiredflag=None, hostname_status=None):
+  """GET all hostnames with the given retiredflag or equivalent hostname status."""
   sql_command = """
       SELECT id, hostname, retired
       FROM hostnames
+      WHERE id > 0
   """
+
+  if hostname is not None:
+    # filter results by hostname
+    sql_command = """
+        {} AND hostname = '{}'
+    """.format(sql_command, hostname)
 
   if retiredflag is not None:
     # query hostnames only with the given retiredflag 
-    validate_retiredflag(retiredflag)
     sql_command = """
-        {} WHERE retired = '{}'
+        {} AND retired = '{}'
+    """.format(sql_command, retiredflag)
+  elif hostname_status is not None:
+    # convert hostname status to equivalent retiredflag and filter hostnames
+    retiredflag = to_retiredflag(hostname_status)
+    sql_command = """
+        {} AND retired = '{}'
     """.format(sql_command, retiredflag)
 
   hostnames_table = execute_sql(sql_command)
@@ -229,7 +314,7 @@ def get_tests_runs_queue(hostname=None):
 
   if hostname is not None:
     # query for queued tests runs on the given hostname
-    validate_hostname(hostname, HOSTNAME_ACTIVE)
+    #validate_hostname(hostname, HOSTNAME_ACTIVE)
     sql_command = """
         {} AND hostnames.hostname = '{}'
     """.format(sql_command, hostname)
@@ -264,28 +349,28 @@ def get_tests_runs_table(hostname=None, tests_runs_status_id=None, tests_runs_st
   
   if hostname is not None:
     # query only tests under given hostname
-    validate_hostname(hostname, HOSTNAME_ACTIVE)
+    #validate_hostname(hostname, HOSTNAME_ACTIVE)
     sql_command = """
         {} AND hostnames.hostname = '{}'
     """.format(sql_command, hostname)
 
   if tests_runs_status_id is not None:
     # query only tests with given status id
-    validate_tests_runs_status_id(tests_runs_status_id)
+    #validate_tests_runs_status_id(tests_runs_status_id)
     sql_command = """
         {} AND statuses.id = '{}'
     """.format(sql_command, tests_runs_status_id)
 
   if tests_runs_status is not None:
     # only query tests with given status name
-    validate_tests_runs_status(tests_runs_status)
+    #validate_tests_runs_status(tests_runs_status)
     sql_command = """
         {} AND statuses.name = '{}'
     """.format(sql_command, tests_runs_status)
 
   if tests_name is not None:
     # query only for tests with the given tests name
-    validate_tests_name(tests_name)
+    #validate_tests_name(tests_name)
     sql_command = """
         {} AND tests.name = '{}'
     """.format(sql_command, tests_name)
@@ -295,7 +380,7 @@ def get_tests_runs_table(hostname=None, tests_runs_status_id=None, tests_runs_st
 
   if not records:
     # no running tests
-    return {}
+    return []
 
   tests_runs_table = []
   for data in records:
@@ -322,6 +407,7 @@ def get_tests_runs_table(hostname=None, tests_runs_status_id=None, tests_runs_st
 
   return tests_runs_table
 
+# TODO NO NEED FOR THIS FUNCTION IT IS THE SAME AS GET TABLE WITH GIVEN FILTER PARAMTERS
 def get_hostnames(hostname, retiredflag=None):
   """Gets hostname rows by hostname and with an optional retiredflag constraint."""
   # query for hostname
@@ -527,12 +613,19 @@ def to_retiredflag(hostname_status):
   """Convers hostnames_status to an equivalent retiredflag string"""
   if is_retired(hostname_status):
     return HOSTNAME_RETIRED
+  elif is_active(hostname_status):
+    return HOSTNAME_ACTIVE
 
-  return HOSTNAME_ACTIVE
+  # error, return uncoverted string
+  return hostname_status
 
 def to_hostname_status(retiredflag):
   """Converts retiredflag to a hostname status strings {'active', 'retired'}"""
   if is_retired(retiredflag):
     return HOSTNAME_STATUS_RETIRED
+  elif is_active(retiredflag):
+    return HOSTNAME_STATUS_ACTIVE
 
-  return HOSTNAME_STATUS_ACTIVE
+  # error, return uncoverted string
+  return retiredflag
+
