@@ -172,7 +172,7 @@ def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None,
                               }
     raw: get raw table as represented in the db schema.
   """
-  filter = get_empty_database_schema()
+  filter = get_database_schema()
   table = []
 
   # zip contraint params to similar dictionary structure as db schema
@@ -187,7 +187,7 @@ def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None,
 
   # merge constraints to filter
   for table in constraints:
-    for field, value in params[table].items():
+    for field, value in constraints[table].items():
       if value is not None:
         filter[table].update({field : value})
 
@@ -210,7 +210,7 @@ def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None,
 
 def zip_params(hostname=None, hostname_status=None, retiredflag=None,
               tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None):
-  """Encapsulates common api paramters to an organized dictionary.
+  """Encapsulates common api paramters to database schema dictionary.
   Example:
      `hostnames` table:
           +----+----------+---------+
@@ -223,14 +223,14 @@ def zip_params(hostname=None, hostname_status=None, retiredflag=None,
       params passed: 
           hostname='sfo-aag', hostname_status='active'
 
-      example returns: {'hostnames' : {'hostname' : 'sfo-aad', 'retired' : 'false', 'id' : None}}
+      example returns: {'hostnames' : {'hostname' : 'sfo-aad', 'retired' : 'false'}}
   """
   if hostname_status:
     # convert to retiredflag and overwrite retiredflag param
     retiredflag = to_retiredflag(hostname_status)
 
   # empty schema structure of database
-  params = get_empty_database_schema(['hostnames', 'tests_runs', 'statuses', 'tests'])
+  params = get_database_schema(['hostnames', 'tests_runs', 'statuses', 'tests'])
 
   # populate hostnames table
   params['hostnames'].update({
@@ -254,6 +254,14 @@ def zip_params(hostname=None, hostname_status=None, retiredflag=None,
       'name' : tests_name
   })
 
+  # remove null data
+  for table in params.keys():
+    for field, value in params[table].items():
+      if value is None:
+        del params[table][field]
+    if not params[table]:
+      del params[table]
+
   return params
 
 def get_raw_table(table_name, constraints={}):
@@ -268,7 +276,7 @@ def get_raw_table(table_name, constraints={}):
   table = execute_sql(sql_command)
   return table
 
-def get_empty_database_schema(table_restrictions=[]):
+def get_database_schema(table_restrictions=[]):
   """Structured dictionary that reflects the database schema."""
   if not table_restrictions:
     # no table restriction 
@@ -278,21 +286,19 @@ def get_empty_database_schema(table_restrictions=[]):
   # construct empty skeleton structure of database
   for table_name in get_table_names_list():
     if table_name in table_restrictions:
-      schema.update({table_name : {}})
-      for field in get_table_fields(table_name):
-        schema[table_name].update({field : None})
+      table = get_empty_table(table_name)
+      schema.update(table)
 
   return schema
 
-def get_empty_table_entry(table_name):
-  """Gets dictionary of table keys without values."""
-  entry = {}
-  fields = get_table_fields(table_name)
+def get_empty_table(table_name):
+  """Gets dictionary of table with null key values."""
+  empty_table = {table_name : {}}
 
-  for field in fields:
-    entry.update({field, None})
+  for field in get_table_fields(table_name):
+    empty_table[table_name].update({field : None})
    
-  return entry 
+  return empty_table
 
 def get_table_fields(table_name):
   """Gets a list of table field names."""
@@ -337,7 +343,7 @@ def get_tests_runs_queue(constraints={}):
       FROM hostnames, tests_runs, tests_runs_queue
       WHERE hostnames.id = tests_runs.hostnames_id
       AND tests_runs.id = tests_runs_queue.test_runs_id
-      AND tests_runs.status = '{}'
+      AND tests_runs.statuses_id = '{}'
       AND hostnames.retired = '{}'
   """.format(STATUS_QUEUED, HOSTNAME_ACTIVE)
 
@@ -393,7 +399,7 @@ def get_tests_runs_table(constraints={}):
       FROM hostnames, tests, tests_runs, statuses
       WHERE hostnames.id = tests_runs.hostnames_id 
       AND tests.id = tests_runs.tests_id
-      AND statuses.id = tests_runs.status
+      AND statuses.id = tests_runs.statuses_id
   """
 
   # append filter conditions
@@ -420,8 +426,8 @@ def get_tests_runs_table(constraints={}):
   
     tests_runs_table.append({
         'hostname' : data[HOSTNAME_INDEX],
-        'test' : data[TESTS_NAME_INDEX],
-        'status' : data[STATUSES_INDEX],
+        'tests_name' : data[TESTS_NAME_INDEX],
+        'statuses_name' : data[STATUSES_INDEX],
         'start_timestamp' : start_timestamp,
         'end_timestamp' : end_timestamp,
         'notes' : data[NOTES_INDEX],

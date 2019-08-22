@@ -1,3 +1,8 @@
+/* NOTE to allow 0 timestamp: use the following */
+/*SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';*/
+/*SET SQL_MODE='ALLOW_INVALID_DATES';*/
+/* url: https://stackoverflow.com/questions/9192027/invalid-default-value-for-create-date-timestamp-field */
+
 CREATE TABLE `hostnames` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`hostname` varchar(255) NOT NULL,
@@ -82,7 +87,7 @@ CREATE TABLE `tests_runs` (
 	`tests_id` INT NOT NULL,
 	`start_timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	`end_timestamp` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00',
-	`status` INT NOT NULL,
+	`statuses_id` INT NOT NULL,
 	`notes` TEXT,
 	`config` TEXT,
 	`scratch` TEXT,

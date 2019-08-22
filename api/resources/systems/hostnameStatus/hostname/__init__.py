@@ -41,4 +41,4 @@ class Hostname(Resource):
     # register hostname as an api resource
     api.add_resource(Hostname, path)
     # directly add sub-resources of hostname
-    TestHistory.add_all_resources(api, '{}/history'.format(path))
+    TestHistory.add_all_resources(api, '{}/test-history'.format(path))

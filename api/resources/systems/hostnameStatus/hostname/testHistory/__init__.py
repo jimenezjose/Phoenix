@@ -1,6 +1,7 @@
 from api.db import (
     get_table,
-    get_table_fields,
+    get_database_schema,
+    zip_params,
     validate)
 
 from flask_restful import Resource, reqparse
@@ -22,17 +23,41 @@ class TestHistory(Resource):
             * (invlaid hostname/statusflag provided)
                 Status Code 404 Not Found
     """
+    parser = reqparse.RequestParser()
     validate(hostname_status=hostname_status, hostname=hostname)
 
-    parser = reqparse.RequestParser()
-    tests_runs_table_fields = get_table_fields('tests_runs')
-    for field in tests_runs_table_fields:
-      parser.add_argument(field, type=str)
-    args = parser.parse_args()
+    authorized_tables = ['hostnames', 'tests', 'tests_runs', 'statuses']
+    filter = get_database_schema(authorized_tables)
 
-    # query for currently running tests
-    tests_runs = get_table('tests_runs', filter=args)
-    return args
+    duplicate_fields = ['id', 'name']
+    # add query parameters 
+    for table in filter:
+      for field in filter[table]:
+        if field in duplicate_fields:
+          # clarify field by prepending table name
+          field = '{}_{}'.format(table, field)
+        parser.add_argument(field, type=str)
+    args = parser.parse_args()
+ 
+    # populate filter with query parameters
+    for table in filter:
+      for field in filter[table]:
+        index = field
+        if field in duplicate_fields:
+          # clarify unique field index in args
+          index = '{}_{}'.format(table, field)
+        value = args[index]
+        filter[table].update({field : value})
+
+    # overwrite filter with static info from uri
+    static_params = zip_params(
+        hostname=hostname, 
+        hostname_status=hostname_status
+    )
+    filter.update(static_params)
+
+    # query for filtered test-history
+    tests_runs = get_table('tests_runs', constraints=filter)
 
     return {'tests_runs' : tests_runs}
 
