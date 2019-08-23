@@ -3,12 +3,10 @@
 # single valide function with optional params
 # look up by tests_name
 # validate arguments from JSON body given 400 error not 404. this is not a db problem rather and route handling prob.
-from api.db import utils
+from api.db.utils import (
+    get_db,
+    close_db)
 
-import mysql.connector
-import click
-from flask import current_app, g
-from flask.cli import with_appcontext
 from flask_restful import abort
 
 # tests_runs constants
@@ -35,30 +33,6 @@ STATUS_QUEUED = 9
 def init_app(app):
   """Binds the cloe_db function to be invoked upon app closure."""
   app.teardown_appcontext(close_db)
-
-def get_db():
-  """Getter method to retrieve the current database connection.
-    
-  Returns:
-      A mysql database connection corresponding with host, database, 
-      and port as configured below.
-  """
-  if 'db' not in g:
-    g.db = mysql.connector.connect(
-        host = 'localhost',
-        user = 'root',
-        passwd = 'Jose88',
-        database = 'TestPhoenix',
-        port = 3306
-    )
-  return g.db     
-
-def close_db(error):
-  """Closes the database connection."""
-  db = g.pop('db', None)
-
-  if db is not None:
-    db.close()
 
 def execute_sql(command, db_commit=False, dictionary=True):
   """Executes a single sql command on the database.
@@ -127,39 +101,6 @@ def delete_hostname(hostname=None, hostname_id=None):
 
   return deleted_rows
 
-def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=None, 
-             tests_name=None, tests_runs_status=None, tests_runs_status_id=None, 
-             table_name=None, http_error_code=404):
-  """Validates system variables in the database."""
-  
-  if hostname is not None:
-    validate_hostname(hostname, None, http_error_code)
-
-  if hostname_status is not None:
-    validate_hostname_status(hostname_status, http_error_code)
-
-  if retiredflag is not None:
-    validate_retiredflag(retiredflag, http_error_code)
-
-  if tests_name is not None:
-    validate_tests_name(tests_name, http_error_code)
-
-  if tests_runs_status is not None:
-    validate_tests_runs_status(tests_runs_status, http_error_code)
-
-  if tests_runs_status_id is not None:
-    validate_tests_runs_status_id(tests_runs_status_id, http_error_code)
-
-  if table_name is not None:
-    validate_table_name(table_name, http_error_code)
-
-  # validate that hostname exisits as 'retiredflag' or equivalent 'hostname_status'
-  if hostname is not None and retiredflag is not None:
-    validate_hostname(hostname, retiredflag, http_error_code)
-  elif hostname is not None and hostname_status is not None:
-    retiredflag = to_retiredflag(hostname_status)
-    validate_hostname(hostname, retiredflag, http_error_code)
-
 def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None, 
               tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None, 
               constraints={}, raw=False):
@@ -168,8 +109,8 @@ def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None,
   Args:
     constraints: dictionary with key of table name then values of constraint parameters.
             Example: constraints = {
-                                   'tests_runs' : {'id' : 2}
-                              }
+                                       'tests_runs' : {'id' : 2}
+                                   }
     raw: get raw table as represented in the db schema.
   """
   filter = get_database_schema()
@@ -197,9 +138,7 @@ def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None,
       if value is not None:
         filter[table].update({field : value})
 
-  if table_name is 'hostnames' and not raw:
-    table = get_hostnames_table(filter)
-  elif table_name is 'tests_runs' and not raw:
+  if table_name is 'tests_runs' and not raw:
     table = get_tests_runs_table(filter)
   elif table_name is 'tests_runs_queue' and not raw:
     table = get_tests_runs_queue(filter)
@@ -207,62 +146,6 @@ def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None,
     table = get_raw_table(table_name, filter)
 
   return table
-
-def zip_params(hostname=None, hostname_status=None, retiredflag=None,
-              tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None):
-  """Encapsulates common api paramters to database schema dictionary.
-  Example:
-     `hostnames` table:
-          +----+----------+---------+
-          | id | hostname | retired |
-          +----+----------+---------+
-          | 4  |  sfo-aag |  false  |
-          +----+----------+---------+
-                    ...
-
-      params passed: 
-          hostname='sfo-aag', hostname_status='active'
-
-      example returns: {'hostnames' : {'hostname' : 'sfo-aad', 'retired' : 'false'}}
-  """
-  if hostname_status:
-    # convert to retiredflag and overwrite retiredflag param
-    retiredflag = to_retiredflag(hostname_status)
-
-  # empty schema structure of database
-  params = get_database_schema(['hostnames', 'tests_runs', 'statuses', 'tests'])
-
-  # populate hostnames table
-  params['hostnames'].update({
-      'hostname' : hostname,
-      'retired' : retiredflag,
-  })
-
-  # populate tests_runs table 
-  params['tests_runs'].update({
-      'status' : tests_runs_status_id,
-  })
-
-  # populate statuses table
-  params['statuses'].update({
-      'id' : tests_runs_status_id,
-      'name' : tests_runs_status_name
-  })
-
-  # populate tests table
-  params['tests'].update({
-      'name' : tests_name
-  })
-
-  # remove null data
-  for table in params.keys():
-    for field, value in params[table].items():
-      if value is None:
-        del params[table][field]
-    if not params[table]:
-      del params[table]
-
-  return params
 
 def get_raw_table(table_name, constraints={}):
   """Gets raw filtered data from table_name."""
@@ -321,19 +204,109 @@ def get_table_names_list():
   
   return table_names_list
 
-def get_hostnames_table(constraints={}):
-  """GET all hostnames with the given retiredflag or equivalent hostname status."""
-  sql_command = """
-      SELECT id, hostname, retired
-      FROM hostnames
+def zip_params(hostname=None, hostname_status=None, retiredflag=None,
+              tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None, 
+              hostname_id=None):
+  """Encapsulates common api paramters to database schema dictionary.
+  Example:
+     `hostnames` table:
+          +----+----------+---------+
+          | id | hostname | retired |
+          +----+----------+---------+
+          | 4  |  sfo-aag |  false  |
+          +----+----------+---------+
+                    ...
+
+      params passed: 
+          hostname='sfo-aag', hostname_status='active'
+
+      example returns: {'hostnames' : {'hostname' : 'sfo-aad', 'retired' : 'false'}}
   """
-  # restrict query on given constraints
-  authorized_tables = ['hostnames']
-  sql_command = append_sql_constraints(sql_command, constraints, authorized_tables)
+  if hostname_status:
+    # convert to retiredflag and overwrite retiredflag param
+    retiredflag = to_retiredflag(hostname_status)
 
-  hostnames_table = execute_sql(sql_command)
+  # empty schema structure of database
+  params = get_database_schema(['hostnames', 'tests_runs', 'statuses', 'tests'])
 
-  return hostnames_table
+  # populate hostnames table
+  params['hostnames'].update({
+      'id' : hostname_id,
+      'hostname' : hostname,
+      'retired' : retiredflag,
+  })
+
+  # populate tests_runs table 
+  params['tests_runs'].update({
+      'status' : tests_runs_status_id,
+  })
+
+  # populate statuses table
+  params['statuses'].update({
+      'id' : tests_runs_status_id,
+      'name' : tests_runs_status_name
+  })
+
+  # populate tests table
+  params['tests'].update({
+      'name' : tests_name
+  })
+
+  # remove null data
+  for table in params.keys():
+    for field, value in params[table].items():
+      if value is None:
+        del params[table][field]
+    if not params[table]:
+      del params[table]
+
+  return params
+
+# TODO CHANGE TESTS_RUNS_STATUS TO TESTS_RUNS_STATUS_NAME
+def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=None, 
+             tests_name=None, tests_runs_status=None, tests_runs_status_id=None, 
+             table_name=None, http_error_code=404):
+  """Validates system variables in the database."""
+  
+  if table_name is not None:
+    validate_table_name(table_name, http_error_code)
+
+  # zip contraint params to similar dictionary structure as db schema
+  params = zip_params(
+    hostname=hostname,
+    hostname_id=hostname_id,
+    hostname_status=hostname_status,
+    retiredflag=retiredflag,
+    tests_runs_status_id=tests_runs_status_id,
+    tests_runs_status_name=tests_runs_status,
+    tests_name=tests_name,
+  )
+
+  # individual paramter is invalid
+  field_error = 'Invalid field name or value \'{}\' not found.'
+  # combination of fields were not found together. Example: hostname with given retired flag. 
+  combo_error = 'Combination {} with values {} not found.'
+
+  for table in params:
+    # validate all paramters now structured as fields in tables
+    for field, value in params[table].items():
+      # validate individual fields
+      field_filter = {table : {field : value}}
+      valid_field = get_table(table, constraints=field_filter)
+      if not valid_field:
+        # no data found on {field : value} in databse
+        error_msg = {field : field_error.format(value)}
+        abort(http_error_code, message=error_msg)
+
+    # validate combination of fields in the same table
+    combo_filter = {table : params[table]}
+    valid_combo = get_table(table, constraints=combo_filter)
+    if not valid_combo:
+      # no row was found in table with combination of fields and values
+      field_list = params[table].keys()
+      value_list = params[table].values()
+      errpr_msg = {table : combo_error.format(field_list, value_list)}
+      abort(http_error_code, message=errors)
 
 def get_tests_runs_queue(constraints={}):
   """GET tests_runs_queue with optional constraint parameter - hostname."""
@@ -376,8 +349,6 @@ def append_sql_constraints(sql_command, constraints={}, authorized_tables=[]):
         """.format(sql_command, table, field, value)
 
   return sql_command
-
-      
 
 def get_tests_runs_table(constraints={}):
   """Gets tests_runs_table with optional constraint paramters."""

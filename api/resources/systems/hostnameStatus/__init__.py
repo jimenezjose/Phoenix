@@ -7,7 +7,6 @@ from api.db import (
     HOSTNAME_ACTIVE,
     validate_hostname_status,
     validate_hostname,
-    get_hostnames_table,
     get_hostnames,
     get_hostname_by_id,
     validate,

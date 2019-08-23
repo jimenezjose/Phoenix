@@ -1,6 +1,5 @@
 from .hostnameStatus import HostnameStatus
-from api.db import get_hostnames_table
-
+from api.db import get_table
 from flask_restful import Resource, reqparse
 
 class Systems(Resource):
@@ -14,7 +13,7 @@ class Systems(Resource):
         Status Code 200 OK.
     """
     # query for all hostnames in the database
-    hostnames_table = get_hostnames_table()
+    hostnames_table = get_table('hostnames')
 
     return {'hostnames' : hostnames_table}, 200
  
