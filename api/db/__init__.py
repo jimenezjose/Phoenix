@@ -57,7 +57,11 @@ def execute_sql(command, db_commit=False, dictionary=True):
   return cursor.fetchall()
 
 def insert_hostname(hostname):
-  """Inserts hostname to database."""
+  """Inserts hostname to database.
+
+  Returns:
+      Single row entry of new hostname in hostnames table.
+  """
   rowid = execute_sql("""
       INSERT INTO hostnames 
       (hostname) VALUES ('{}')
@@ -67,19 +71,30 @@ def insert_hostname(hostname):
   return inserted_row
 
 def delete_hostname(hostname=None, hostname_id=None):
-  """Deletes hostnames by setting hostname.retired to true.""" 
+  """Deletes hostnames by setting hostname.retired to true.
+
+  Returns:
+      A list of 'deleted' (newly retired) hostnames.
+  """ 
   # to be deleted rows from hostnames table.
   deleted_rows = []
 
   if hostname is None and hostname_id is None:
     # require at least one parameter 
-    return deleted_rows
+    return []
 
+  # return list of deleted rows
   if hostname_id is not None:
-    deleted_rows = get_hostnames_by_id(hostname_id) 
+    deleted_rows = [get_hostname_by_id(hostname_id)]
   elif hostname is not None:
     deleted_rows = get_hostnames(hostname, HOSTNAME_ACTIVE) 
 
+  if deleted_rows:
+    # hostname must be active to be deleted.
+    row = deleted_rows[0]
+    if is_retired(row['retired']):
+      return []
+  
   sql_command = """
       UPDATE hostnames
       SET retired = '{}'
@@ -101,7 +116,7 @@ def delete_hostname(hostname=None, hostname_id=None):
 
   return deleted_rows
 
-def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None, 
+def get_table(table_name, hostname=None, hostname_id=None, hostname_status=None, retiredflag=None, 
               tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None, 
               constraints={}, raw=False):
   """Gets table content with optional constraint paramters.
@@ -119,6 +134,7 @@ def get_table(table_name, hostname=None, hostname_status=None, retiredflag=None,
   # zip contraint params to similar dictionary structure as db schema
   params = zip_params(
     hostname=hostname,
+    hostname_id=hostname_id,
     hostname_status=hostname_status,
     retiredflag=retiredflag,
     tests_runs_status_id=tests_runs_status_id,
@@ -285,7 +301,12 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
   # individual paramter is invalid
   field_error = 'Invalid field name or value \'{}\' not found.'
   # combination of fields were not found together. Example: hostname with given retired flag. 
-  combo_error = 'Combination {} with values {} not found.'
+  combo_error = 'Raw field combination {} with respective raw values {} not found.'
+
+
+  # iterate through scheme and check if same structure exists in params.
+  # edge case would have to handle with clustering table paramters
+  # this method of breaking for an incorrect value break when validating for insert? 
 
   for table in params:
     # validate all paramters now structured as fields in tables
@@ -305,8 +326,8 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
       # no row was found in table with combination of fields and values
       field_list = params[table].keys()
       value_list = params[table].values()
-      errpr_msg = {table : combo_error.format(field_list, value_list)}
-      abort(http_error_code, message=errors)
+      error_msg = {table : combo_error.format(field_list, value_list)}
+      abort(http_error_code, message=error_msg)
 
 def get_tests_runs_queue(constraints={}):
   """GET tests_runs_queue with optional constraint parameter - hostname."""
@@ -410,34 +431,20 @@ def get_tests_runs_table(constraints={}):
   return tests_runs_table
 
 # TODO NO NEED FOR THIS FUNCTION IT IS THE SAME AS GET TABLE WITH GIVEN FILTER PARAMTERS
-def get_hostnames(hostname, retiredflag=None):
-  """Gets hostname rows by hostname and with an optional retiredflag constraint."""
+def get_hostnames(hostname, retiredflag=None, hostname_status=None):
+  """Gets hostname rows by hostname and with an optional retired status constraint."""
   # query for hostname
-  sql_command = """
-      SELECT id, hostname, retired
-      FROM hostnames
-      WHERE hostname = '{}'
-  """.format(hostname)
+  hostnames = get_table(
+      'hostnames',
+      hostname=hostname,
+      retiredflag=retiredflag,
+      hostname_status=hostname_status
+  )
+  return hostnames
 
-  if retiredflag is not None:
-    # only query for hostname with given retiredflag
-    sql_command = """
-        {} AND retired = '{}'
-    """.format(sql_command, retiredflag)
-
-  # list of hostnames that follow the criteria
-  hostname_row_list = execute_sql(sql_command)
-
-  return hostname_row_list
-
-def get_hostname_by_id(id):
+def get_hostname_by_id(hostname_id):
   """Gets hostnames row by row id in hostnames table."""
-  # query hostname id 
-  hostname_row_list = execute_sql("""
-    SELECT id, hostname, retired
-    FROM hostnames
-    WHERE id = '{}'
-  """.format(id))
+  hostname_row_list = get_table('hostnames', hostname_id=hostname_id)
 
   # there is only one hostname with the given unique id
   hostname_row = None

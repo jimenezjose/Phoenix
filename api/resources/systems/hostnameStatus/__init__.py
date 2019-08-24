@@ -7,7 +7,6 @@ from api.db import (
     HOSTNAME_ACTIVE,
     validate_hostname_status,
     validate_hostname,
-    get_hostnames,
     get_hostname_by_id,
     validate,
     get_table,
@@ -88,7 +87,17 @@ class HostnameStatus(Resource):
     return inserted_hostname
 
   def delete(self, hostname_status):
-    """DELETE the hostname by setting the retired flag to True."""
+    """DELETE the hostname by setting the retired flag to True.
+
+    Args:
+        hostname_status: string annotation of a system to show retired status. 
+
+    Returns:
+        List of deleted hostnames. 
+    """
+    # TODO return change documentation in future
+    validate(hostname_status=hostname_status)
+
     if is_retired(hostname_status):
         # only remove active hostnames; return 405 Method Not Allowed
         return {'message' : 'The method is not allowed for the requested URL.'}, 405
@@ -108,37 +117,22 @@ class HostnameStatus(Resource):
       }
       abort(400, message=errors)
 
-    # validate url hostname status
-    validate(hostname_status=hostname_status, http_error_code=404)
-    # `
-    validate(hostname=args['hostname'], hostname_id=args['hostname_id'], http_error_code=400)
+    # JSON body parameters do not exist in the database
+    validate(
+        hostname=args['hostname'], 
+        hostname_id=args['hostname_id'], 
+        http_error_code=400,
+    )
 
+    # TODO CHANGE THIS TO NOT BE A LIST: PRELIMARY LIST FOR DEBUG AND DEVELOPING PURPOSES
+    hostnames_deleted = []
     if args['hostname_id']:
-      return delete_hostname(hostname_id=args['hostname_id'])
+      hostnames_deleted = delete_hostname(hostname_id=args['hostname_id'])
     elif args['hostname']:
-      return delete_hostname(hostname=args['hostname'])
+      hostnames_deleted = delete_hostname(hostname=args['hostname'])
 
-    # get all info on VALID hostname of interest. 
-    hostname_list = get_hostnames(args['hostname'], HOSTNAME_ACTIVE)
-    # only one unique ACTIVE hostname will exist guaranteed.
-    hostname_row = hostname_list[0]
-    
-    return 'error'
+    return {'hostnames' : hostnames_deleted}
 
-    execute_sql("""
-        UPDATE hostnames 
-        SET retired = '{}' 
-        WHERE hostname = '{}' AND retired = '{}'
-    """.format(HOSTNAME_RETIRED, args['hostname'], HOSTNAME_ACTIVE), db_commit=True)
-
-    # get updated hostname row 
-    updated_hostname_row = get_hostname_by_id(hostname_row['id'])
-
-    return updated_hostname_row
-
-    return {'message' : 'DELETE hostname: {} (set as retired with id: {})'.format(args['hostname'], rowid)}, 200
-
-  
   @staticmethod  
   def add_all_resources(api, path):
     """Recursively adds all sub-resources in the 'system/<string:hostname_status>' resource.
