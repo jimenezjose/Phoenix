@@ -2,20 +2,16 @@
 # TODO delet by hostname id optional argument in delete request
 from .hostname import Hostname
 from api.db import (
-    execute_sql,
-    HOSTNAME_RETIRED,
-    HOSTNAME_ACTIVE,
-    validate_hostname_status,
-    validate_hostname,
-    get_hostname_by_id,
     validate,
     get_table,
     delete_hostname,
     insert_hostname,
-    is_retired,
-    to_retiredflag)
+    is_retired)
 
-from flask_restful import Resource, reqparse, abort
+from flask_restful import (
+    Resource, 
+    reqparse, 
+    abort)
 
 class HostnameStatus(Resource):
   """Statusflag that annotates a hostname system as 'retired' or 'active'."""
@@ -36,7 +32,6 @@ class HostnameStatus(Resource):
                 Status Code: 404 Not Found
     """
     validate(hostname_status=hostname_status)
-
     # Get all hostnames with given retired hostname status
     hostnames_table = get_table('hostnames', hostname_status=hostname_status)
 
@@ -113,11 +108,11 @@ class HostnameStatus(Resource):
       errors = {
           'hostname' : 'Missing parameter in JSON body',
           'hostname_id' : 'Missing parameter in JSON body',
-          'message' : 'At least one paramter is required.',
+          'message' : 'At least one paramter is required',
       }
       abort(400, message=errors)
 
-    # JSON body parameters do not exist in the database
+    # validate that the active hostname exists in the db
     validate(
         hostname=args['hostname'], 
         hostname_id=args['hostname_id'], 

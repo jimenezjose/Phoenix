@@ -1,6 +1,8 @@
 from .hostnameStatus import HostnameStatus
 from api.db import get_table
-from flask_restful import Resource, reqparse
+from flask_restful import (
+    Resource, 
+    reqparse)
 
 class Systems(Resource):
   """System resource for hostnames organization and details."""

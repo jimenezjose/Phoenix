@@ -282,10 +282,102 @@ def zip_params(hostname=None, hostname_status=None, retiredflag=None,
 def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=None, 
              tests_name=None, tests_runs_status=None, tests_runs_status_id=None, 
              table_name=None, http_error_code=404):
-  """Validates system variables in the database."""
-  
+ 
+  """
+    static type validation:
+      - data that can not be queried but defined externally by the developer.
+
+        * hostname_status
+
+
+    static type validation internally in the database:
+      - data exists in a specific table and can queried to be confirmed
+
+        * retiredflag
+          - should have retiredflag internally in (type) column in DESCRIBE <table>;
+
+        * tests_name
+        * tests_runs_status
+        * tests_runs_status_id
+
+        * hostname 
+        * hostname_id
+
+    static check from database table info:
+   
+        * table name
+
+    dynamic check for field:
+    
+      
+  """
   if table_name is not None:
+    # check if table exists in database
     validate_table_name(table_name, http_error_code)
+  if hostname_status is not None:
+    # validate developer defined system variables
+    validate_hostname_status(hostname_status, http_error_code)
+
+  # emulate database schema with placing paramters to their respective table locations.
+  params = zip_params(
+    hostname=hostname,
+    hostname_id=hostname_id,
+    hostname_status=hostname_status,
+    retiredflag=retiredflag,
+    tests_runs_status_id=tests_runs_status_id,
+    tests_runs_status_name=tests_runs_status,
+    tests_name=tests_name,
+  )
+
+  database_table_names = get_table_names_list()
+
+  for table in params:
+    for field, value in params[table].items():
+      # 
+    
+      ''' example : tests_runs{  hostnames_id, tests_id, statuses_id  } '''  
+      field_is_pointer = False
+      for other_table in databas_table_names: 
+        if other_table in field:
+          # current field points to a different table.
+          field_is_pointer = True
+          break
+      if field_is_pointer:
+        # process field in its native table for easier validation of field values
+        continue
+
+    ''' hostnames: {id, hostname, retired}'''
+    validate_datatype(field)
+    # validate existence for some params - given developer rules
+    
+
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  return 
+  # input validation
+  '''
+  table_name, hostname_status, retiredflag, tests_runs_staus_id, tests_runs_status, tests_name
+  '''
+  if table_name:
+    validate_table_name(table_name, http_error_code)
+
+ # validation to check if data exisits in database
+  '''
+  hostname, hostname_id
+  '''
 
   # zip contraint params to similar dictionary structure as db schema
   params = zip_params(
@@ -303,18 +395,18 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
   # combination of fields were not found together. Example: hostname with given retired flag. 
   combo_error = 'Raw field combination {} with respective raw values {} not found.'
 
-
   # iterate through scheme and check if same structure exists in params.
   # edge case would have to handle with clustering table paramters
   # this method of breaking for an incorrect value break when validating for insert? 
 
+  # TODO THIS ASSUMES A DATA EXISTS FOR VALID VALUES IN DATABASE!!!
   for table in params:
     # validate all paramters now structured as fields in tables
     for field, value in params[table].items():
       # validate individual fields
       field_filter = {table : {field : value}}
-      valid_field = get_table(table, constraints=field_filter)
-      if not valid_field:
+      table_content = get_table(table, constraints=field_filter)
+      if not table_content:
         # no data found on {field : value} in databse
         error_msg = {field : field_error.format(value)}
         abort(http_error_code, message=error_msg)
@@ -349,6 +441,7 @@ def get_tests_runs_queue(constraints={}):
 
   return tests_runs_queue
 
+# empty authorized is all tables or no tables to be autghorized? TODO
 def append_sql_constraints(sql_command, constraints={}, authorized_tables=[]):
   """appends sql conditions according to the constraints paramter.
 

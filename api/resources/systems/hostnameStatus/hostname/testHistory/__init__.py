@@ -1,6 +1,7 @@
 from api.db import (
     get_table,
     get_database_schema,
+    #get_duplicate_fields,
     zip_params,
     validate)
 
@@ -29,6 +30,7 @@ class TestHistory(Resource):
     authorized_tables = ['hostnames', 'tests', 'tests_runs', 'statuses']
     filter = get_database_schema(authorized_tables)
 
+    #duplicate_fields = get_duplicate_fields(authorized_tables)
     duplicate_fields = ['id', 'name']
     # add query parameters 
     for table in filter:
