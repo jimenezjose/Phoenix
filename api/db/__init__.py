@@ -179,11 +179,11 @@ def get_database_schema(table_restrictions=[]):
   """Structured dictionary that reflects the database schema."""
   if not table_restrictions:
     # no table restriction 
-    table_restrictions = get_table_names_list()
+    table_restrictions = get_database_table_list()
 
   schema = {}
   # construct empty skeleton structure of database
-  for table_name in get_table_names_list():
+  for table_name in get_database_table_list():
     if table_name in table_restrictions:
       table = get_empty_table(table_name)
       schema.update(table)
@@ -209,7 +209,7 @@ def get_table_fields(table_name):
 
   return table_fields
 
-def get_table_names_list():
+def get_database_table_list():
   """Gets list of tables existent in database."""
   records = execute_sql('SHOW TABLES', dictionary=False)
 
@@ -234,7 +234,7 @@ def zip_params(hostname=None, hostname_status=None, retiredflag=None,
                     ...
 
       params passed: 
-          hostname='sfo-aag', hostname_status='active'
+          hostname='sfo-aad', hostname_status='active'
 
       example returns: {'hostnames' : {'hostname' : 'sfo-aad', 'retired' : 'false'}}
   """
@@ -254,7 +254,8 @@ def zip_params(hostname=None, hostname_status=None, retiredflag=None,
 
   # populate tests_runs table 
   params['tests_runs'].update({
-      'status' : tests_runs_status_id,
+      'hostnames_id': hostname_id,
+      'statuses_id' : tests_runs_status_id,
   })
 
   # populate statuses table
@@ -282,35 +283,9 @@ def zip_params(hostname=None, hostname_status=None, retiredflag=None,
 def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=None, 
              tests_name=None, tests_runs_status=None, tests_runs_status_id=None, 
              table_name=None, http_error_code=404):
- 
-  """
-    static type validation:
-      - data that can not be queried but defined externally by the developer.
+  """Database check of system variable integrity. 
+  """ 
 
-        * hostname_status
-
-
-    static type validation internally in the database:
-      - data exists in a specific table and can queried to be confirmed
-
-        * retiredflag
-          - should have retiredflag internally in (type) column in DESCRIBE <table>;
-
-        * tests_name
-        * tests_runs_status
-        * tests_runs_status_id
-
-        * hostname 
-        * hostname_id
-
-    static check from database table info:
-   
-        * table name
-
-    dynamic check for field:
-    
-      
-  """
   if table_name is not None:
     # check if table exists in database
     validate_table_name(table_name, http_error_code)
@@ -318,7 +293,7 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
     # validate developer defined system variables
     validate_hostname_status(hostname_status, http_error_code)
 
-  # emulate database schema with placing paramters to their respective table locations.
+  # emulate database schema with placing parameters to their respective table locations.
   params = zip_params(
     hostname=hostname,
     hostname_id=hostname_id,
@@ -329,44 +304,86 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
     tests_name=tests_name,
   )
 
-  database_table_names = get_table_names_list()
+  # setup prefix notation for all pointers in the database
+  database_table_list = get_database_table_list()
+  for index in range(len(database_table_list)):
+    database_table_list[index] += '_'
 
   for table in params:
     for field, value in params[table].items():
-      # 
-    
-      ''' example : tests_runs{  hostnames_id, tests_id, statuses_id  } '''  
-      field_is_pointer = False
-      for other_table in databas_table_names: 
-        if other_table in field:
-          # current field points to a different table.
-          field_is_pointer = True
-          break
-      if field_is_pointer:
-        # process field in its native table for easier validation of field values
-        continue
+      validate_field_datatype(table, field, value)
+      
+      if '_' not in table:
+        # field is not a pointer by naming convention 
+        return 
 
-    ''' hostnames: {id, hostname, retired}'''
-    validate_datatype(field)
-    # validate existence for some params - given developer rules
-    
+      abort(404, message=field)
+      for prefix in database_table_list:
+        if prefix in table:
+          # example: hostnames_id -> ref_table = hostnames, ref_field = id
+          ref_table = prefix.replace('_', '')
+          ref_field = field.replace(prefix, '')
+          validate_field_pointer(ref_table, ref_field, value)
 
+def validate_field_datatype(table, field, value, http_error_code=400):
+  """Type checking for enums, integers and strings."""
+  datatype = get_field_datatype(table, field)
+  error_msg = 'ValueError. Type mismatch for {}: \'{}\''.format(datatype, '{}')
+  errors = {}
+
+  if 'int' in datatype:
+    try:
+      int(value)
+      integer = 1
+    except ValueError:
+      # value is not an integer
+      errors.update({table : {field : error_msg.format(value)}})
+  elif 'enum' in datatype:
+    tuple_str = datatype.replace('enum', '')
+    enum = eval(tuple_str)
+    if value not in enum:
+      # value not in enum list
+      errors.update({table : {field : error_msg.format(value)}})
+  
+  # TODO enum check would be tables tests and statuses since they point to static information
+
+  if errors:
+    # throw bad request by default for value error
+    abort(http_error_code, message=errors)
+
+def validate_field_pointer(ref_table, ref_field, value, http_errro_code=404):
+  """Field points to an invalid row of a table."""
+  table_entry = {ref_table : {ref_field : value}}
+  records = get_table(ref_table, constraints=table_entry)
+  errors = {}
+
+  if not records:
+    pointer_field = '{}_{}'.format(ref_table, ref_field)
+    errros.update({pointer_field : 'Invalid entry: \'{}\' - Not Found'.format(value)})
+
+  if errors:
+    abort(http_error_code, message=errors)
+
+  
+def get_field_datatype(table_name, field_name):
+  """Fetch datatype of field."""
+  table_info = execute_sql('DESCRIBE `{}`'.format(table_name))
+
+  datatype = None
+  for row_info in table_info:
+    if field_name == row_info['Field']:
+      datatype = row_info['Type']
+
+  return datatype
+
+  
+    
           
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-  return 
+def ___________temp():  
   # input validation
   '''
   table_name, hostname_status, retiredflag, tests_runs_staus_id, tests_runs_status, tests_name
