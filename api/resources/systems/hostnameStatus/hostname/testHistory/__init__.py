@@ -30,7 +30,6 @@ class TestHistory(Resource):
     authorized_tables = ['hostnames', 'tests', 'tests_runs', 'statuses']
     filter = get_database_schema(authorized_tables)
 
-    #duplicate_fields = get_duplicate_fields(authorized_tables)
     duplicate_fields = ['id', 'name']
     # add query parameters 
     for table in filter:
@@ -38,7 +37,7 @@ class TestHistory(Resource):
         if field in duplicate_fields:
           # clarify field by prepending table name
           field = '{}_{}'.format(table, field)
-        parser.add_argument(field, type=str)
+        parser.add_argument(field, type=str, location='args')
     args = parser.parse_args()
  
     # populate filter with query parameters
