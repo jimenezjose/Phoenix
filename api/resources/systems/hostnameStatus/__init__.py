@@ -1,4 +1,3 @@
-# NOTE DELETE CANNOT OCCUR IF HOSTNAME HAS RUNNING OR QUEUED TESTS.
 # TODO delet by hostname id optional argument in delete request
 from .hostname import Hostname
 from api.db import (
@@ -32,7 +31,7 @@ class HostnameStatus(Resource):
             * (status provided unknown) - not {active, retired}
                 Status Code: 404 Not Found
     """
-    validate(hostname_status=hostname_status)
+    validate(hostname_status=hostname_status, htpp_error_code=404)
     # Get all hostnames with given retired hostname status
     hostnames_table = get_table('hostnames', hostname_status=hostname_status)
 
@@ -45,6 +44,8 @@ class HostnameStatus(Resource):
         hostname_status: string annotation of a system for a binary representation of an 'active' 
 
     Returns:
+        Inserted hostname info.
+
         Success: 
             * (hostname inserted into the database)
                 Status Code: 201 Created
@@ -54,12 +55,12 @@ class HostnameStatus(Resource):
                 Status Code: 404 Not Found
             * (attempt to add a non-active hostname not allowed)
                 Status Code: 405 Method Not Allowed
-            * (required arguments not supplied in request) - implicit return by reqparse.
+            * (required arguments not supplied in request)
                 Status Code: 404 Not Found
             * (duplicate insertion for active hostname not allowed) 
                 Status Code: 409 Conflict
     """
-    validate(hostname_status=hostname_status)
+    validate(hostname_status=hostname_status, htpp_error_code=404)
 
     # require 'hostname' parameter from request. 
     parser = reqparse.RequestParser()
@@ -92,7 +93,7 @@ class HostnameStatus(Resource):
         List of deleted hostnames. 
     """
     # TODO return change documentation in future
-    validate(hostname_status=hostname_status)
+    validate(hostname_status=hostname_status, http_error_code=404)
 
     if is_retired(hostname_status):
         # only remove active hostnames; return 405 Method Not Allowed
@@ -113,17 +114,29 @@ class HostnameStatus(Resource):
       }
       abort(400, message=errors)
 
-    # validate that the active hostname exists in the db
+    # validate that hostname info exists in the db 
     validate(
         hostname=args['hostname'], 
         hostnames_id=args['hostnames_id'], 
         http_error_code=400
     )
 
-    return
+    # validate that the hostname is active 
+    active_hostname = get_table(
+        'hostnames', 
+        hostname=args['hostname'], 
+        hostnames_id=args['hostnames_id'], 
+        hostname_status=hostname_status
+    )
+
+    if not active_hostname:
+      # hostname is not active - validation check failed.
+      system_id = 'hostnames_id' if args['hostnames_id'] else 'hostname'
+      errors = {system_id : '\'{}\' must be active to be deleted.'.format(args[system_id])}
+      abort(409, messages=errors)
 
     # if hostname is running tests abort request
-    running_tests = get_running_tests(args['hostname'])
+    running_tests = get_running_tests(hostname=args['hostname'], hostnames_id=args['hostnames_id'])
 
     if running_tests:
       # system currently running tests - throw 400 Bad Request.
@@ -131,13 +144,7 @@ class HostnameStatus(Resource):
       errors = {args['hostname'] : error_msg}
       abort(400, message=errors)
 
-    # TODO CHANGE THIS TO NOT BE A LIST: PRELIMARY LIST FOR DEBUG AND DEVELOPING PURPOSES
-    hostnames_deleted = []
-    if args['hostnames_id']:
-      hostnames_deleted = delete_hostname(hostnames_id=args['hostnames_id'])
-    elif args['hostname']:
-      hostnames_deleted = delete_hostname(hostname=args['hostname'])
-
+    # internally hostnames_id takes precedence over hostname string
     hostnames_deleted = delete_hostname(hostnames_id=args['hostnames_id'], hostname=args['hostname'])
 
     return {'hostnames' : hostnames_deleted}

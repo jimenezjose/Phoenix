@@ -37,7 +37,7 @@ class TestHistory(Resource):
         if field in duplicate_fields:
           # clarify field by prepending table name
           field = '{}_{}'.format(table, field)
-        parser.add_argument(field, type=str)
+        parser.add_argument(field, type=str, location='args')
     args = parser.parse_args()
  
     # populate filter with query parameters

@@ -316,11 +316,14 @@ def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag
     database_table_list[index] += '_'
 
   for table in params:
-    index = 0
     for field, value in params[table].items():
       validate_field_datatype(table, field, value)
-      
-      if '_' not in table:
+     
+      if field == 'id':
+        # validate that 'id' points to a defined table row
+        validate_field_pointer(table, field, value)
+        continue
+      elif '_' not in field:
         # field is not a pointer by naming convention 
         continue
 
@@ -330,6 +333,7 @@ def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag
           ref_table = prefix.replace('_', '')
           ref_field = field.replace(prefix, '')
           validate_field_pointer(ref_table, ref_field, value)
+          break
 
 def validate_field_datatype(table, field, value, http_error_code=400):
   """Type checking for enums, integers and strings."""
@@ -360,12 +364,12 @@ def validate_field_datatype(table, field, value, http_error_code=400):
       # no data matched the value provided in the given table
       errors.update({table : {field : invalid_entry_msg.format(value)}})
 
-  if field == 'id':
+  #if field == 'id':
     # primary key 'id' needs to belong to an existing table row
-    valid_entry = get_table(table, constraints=table_entry)
-    if not valid_entry:
+    #valid_entry = get_table(table, constraints=table_entry)
+    #if not valid_entry:
       # no row found with provided 'id'
-      errors.update({table : {field : invalid_entry_msg.format(value)}})    
+      #errors.update({table : {field : invalid_entry_msg.format(value)}})    
   
   if errors:
     # throw bad request by default for value error
@@ -374,12 +378,14 @@ def validate_field_datatype(table, field, value, http_error_code=400):
 def validate_field_pointer(ref_table, ref_field, value, http_errro_code=404):
   """Field points to an invalid row of a table."""
   table_entry = {ref_table : {ref_field : value}}
-  records = get_table(ref_table, constraints=table_entry)
+  pointer_data = get_table(ref_table, constraints=table_entry)
+
+  error_msg = 'Invalid entry. {}.{} with value \'{}\' Not Found'.format(ref_table, ref_field, '{}')
   errors = {}
 
-  if not records:
+  if not pointer_data:
     pointer_field = '{}_{}'.format(ref_table, ref_field)
-    errros.update({pointer_field : 'Invalid entry: \'{}\' - Not Found'.format(value)})
+    errros.update({pointer_field : error_msg.format(value)})
 
   if errors:
     abort(http_error_code, message=errors)
@@ -520,11 +526,15 @@ def get_hostname_by_id(hostnames_id):
 
   return hostname_row
 
-def get_running_tests(hostname=None):
+def get_running_tests(hostname=None, hostnames_id=None):
   """Gets all tests_runs for a hostname that are currently running or queued."""
   filter = get_empty_table('tests_runs')
-  if hostname is not None:
+
+  if hostnames_id is not None:
+    filter.update(zip_params(hostnames_id=hostnames_id))
+  elif hostname is not None:
     filter.update(zip_params(hostname=hostname))
+
   # running tests have an undefined end time
   filter['tests_runs'].update({
       'end_timestamp' : NULL_TIMESTAMP
