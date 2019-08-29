@@ -6,6 +6,7 @@ from api.db import (
     get_table,
     delete_hostname,
     insert_hostname,
+    get_running_tests,
     is_retired)
 
 from flask_restful import (
@@ -100,14 +101,14 @@ class HostnameStatus(Resource):
     # require 'hostname' parameter from request. 
     parser = reqparse.RequestParser()
     parser.add_argument('hostname', type=str)
-    parser.add_argument('hostname_id', type=int)
+    parser.add_argument('hostnames_id', type=int)
     args = parser.parse_args()
 
-    if args['hostname'] is None and args['hostname_id'] is None:
+    if args['hostname'] is None and args['hostnames_id'] is None:
       # at least one argument is required otherwise throw 400 Bad Request.
       errors = {
           'hostname' : 'Missing parameter in JSON body',
-          'hostname_id' : 'Missing parameter in JSON body',
+          'hostnames_id' : 'Missing parameter in JSON body',
           'message' : 'At least one paramter is required',
       }
       abort(400, message=errors)
@@ -115,16 +116,29 @@ class HostnameStatus(Resource):
     # validate that the active hostname exists in the db
     validate(
         hostname=args['hostname'], 
-        hostname_id=args['hostname_id'], 
-        http_error_code=400,
+        hostnames_id=args['hostnames_id'], 
+        http_error_code=400
     )
+
+    return
+
+    # if hostname is running tests abort request
+    running_tests = get_running_tests(args['hostname'])
+
+    if running_tests:
+      # system currently running tests - throw 400 Bad Request.
+      error_msg = 'System is Busy. Currently processing {} tests.'.format(len(running_tests))
+      errors = {args['hostname'] : error_msg}
+      abort(400, message=errors)
 
     # TODO CHANGE THIS TO NOT BE A LIST: PRELIMARY LIST FOR DEBUG AND DEVELOPING PURPOSES
     hostnames_deleted = []
-    if args['hostname_id']:
-      hostnames_deleted = delete_hostname(hostname_id=args['hostname_id'])
+    if args['hostnames_id']:
+      hostnames_deleted = delete_hostname(hostnames_id=args['hostnames_id'])
     elif args['hostname']:
       hostnames_deleted = delete_hostname(hostname=args['hostname'])
+
+    hostnames_deleted = delete_hostname(hostnames_id=args['hostnames_id'], hostname=args['hostname'])
 
     return {'hostnames' : hostnames_deleted}
 

@@ -30,6 +30,9 @@ STATUS_SCHEDULED = 7
 STATUS_STARTED = 8
 STATUS_QUEUED = 9
 
+# STATIC DATATYPE TABLES
+DATATYPE_TABLES = ['statuses', 'tests', 'commands', 'hostnames']
+
 def init_app(app):
   """Binds the cloe_db function to be invoked upon app closure."""
   app.teardown_appcontext(close_db)
@@ -70,7 +73,7 @@ def insert_hostname(hostname):
   inserted_row = get_hostname_by_id(rowid)
   return inserted_row
 
-def delete_hostname(hostname=None, hostname_id=None):
+def delete_hostname(hostname=None, hostnames_id=None):
   """Deletes hostnames by setting hostname.retired to true.
 
   Returns:
@@ -79,13 +82,13 @@ def delete_hostname(hostname=None, hostname_id=None):
   # to be deleted rows from hostnames table.
   deleted_rows = []
 
-  if hostname is None and hostname_id is None:
+  if hostname is None and hostnames_id is None:
     # require at least one parameter 
     return []
 
   # return list of deleted rows
-  if hostname_id is not None:
-    deleted_rows = [get_hostname_by_id(hostname_id)]
+  if hostnames_id is not None:
+    deleted_rows = [get_hostname_by_id(hostnames_id)]
   elif hostname is not None:
     deleted_rows = get_hostnames(hostname, HOSTNAME_ACTIVE) 
 
@@ -94,6 +97,9 @@ def delete_hostname(hostname=None, hostname_id=None):
     row = deleted_rows[0]
     if is_retired(row['retired']):
       return []
+  else:
+    # nothing to delete
+    return []
   
   sql_command = """
       UPDATE hostnames
@@ -101,11 +107,11 @@ def delete_hostname(hostname=None, hostname_id=None):
       WHERE retired = '{}'
   """.format(HOSTNAME_RETIRED, HOSTNAME_ACTIVE)
 
-  if hostname_id is not None:
+  if hostnames_id is not None:
     # delete hostname row by id
     sql_command = """
         {} AND id = '{}'
-    """.format(sql_command, hostname_id)
+    """.format(sql_command, hostnames_id)
   elif hostname is not None:
     # delete hostname by name
     sql_command = """
@@ -116,7 +122,7 @@ def delete_hostname(hostname=None, hostname_id=None):
 
   return deleted_rows
 
-def get_table(table_name, hostname=None, hostname_id=None, hostname_status=None, retiredflag=None, 
+def get_table(table_name, hostname=None, hostnames_id=None, hostname_status=None, retiredflag=None, 
               tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None, 
               constraints={}, raw=False):
   """Gets table content with optional constraint paramters.
@@ -134,7 +140,7 @@ def get_table(table_name, hostname=None, hostname_id=None, hostname_status=None,
   # zip contraint params to similar dictionary structure as db schema
   params = zip_params(
     hostname=hostname,
-    hostname_id=hostname_id,
+    hostnames_id=hostnames_id,
     hostname_status=hostname_status,
     retiredflag=retiredflag,
     tests_runs_status_id=tests_runs_status_id,
@@ -222,7 +228,7 @@ def get_database_table_list():
 
 def zip_params(hostname=None, hostname_status=None, retiredflag=None,
               tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None, 
-              hostname_id=None):
+              hostnames_id=None):
   """Encapsulates common api paramters to database schema dictionary.
   Example:
      `hostnames` table:
@@ -247,14 +253,14 @@ def zip_params(hostname=None, hostname_status=None, retiredflag=None,
 
   # populate hostnames table
   params['hostnames'].update({
-      'id' : hostname_id,
+      'id' : hostnames_id,
       'hostname' : hostname,
       'retired' : retiredflag,
   })
 
   # populate tests_runs table 
   params['tests_runs'].update({
-      'hostnames_id': hostname_id,
+      'hostnames_id': hostnames_id,
       'statuses_id' : tests_runs_status_id,
   })
 
@@ -280,7 +286,7 @@ def zip_params(hostname=None, hostname_status=None, retiredflag=None,
   return params
 
 # TODO CHANGE TESTS_RUNS_STATUS TO TESTS_RUNS_STATUS_NAME
-def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=None, 
+def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag=None, 
              tests_name=None, tests_runs_status=None, tests_runs_status_id=None, 
              table_name=None, http_error_code=404):
   """Database check of system variable integrity. 
@@ -296,7 +302,7 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
   # emulate database schema with placing parameters to their respective table locations.
   params = zip_params(
     hostname=hostname,
-    hostname_id=hostname_id,
+    hostnames_id=hostnames_id,
     hostname_status=hostname_status,
     retiredflag=retiredflag,
     tests_runs_status_id=tests_runs_status_id,
@@ -310,16 +316,16 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
     database_table_list[index] += '_'
 
   for table in params:
+    index = 0
     for field, value in params[table].items():
       validate_field_datatype(table, field, value)
       
       if '_' not in table:
         # field is not a pointer by naming convention 
-        return 
+        continue
 
-      abort(404, message=field)
       for prefix in database_table_list:
-        if prefix in table:
+        if prefix in field:
           # example: hostnames_id -> ref_table = hostnames, ref_field = id
           ref_table = prefix.replace('_', '')
           ref_field = field.replace(prefix, '')
@@ -327,8 +333,11 @@ def validate(hostname=None, hostname_status=None, hostname_id=None, retiredflag=
 
 def validate_field_datatype(table, field, value, http_error_code=400):
   """Type checking for enums, integers and strings."""
+  table_entry = {table : {field :  value}}
   datatype = get_field_datatype(table, field)
-  error_msg = 'ValueError. Type mismatch for {}: \'{}\''.format(datatype, '{}')
+
+  invalid_entry_msg = 'Invalid Entry. {}.{} with value \'{}\' Not Found'.format(table, field, '{}')
+  value_error_msg = 'ValueError. Type mismatch for {}: \'{}\''.format(datatype, '{}')
   errors = {}
 
   if 'int' in datatype:
@@ -337,16 +346,27 @@ def validate_field_datatype(table, field, value, http_error_code=400):
       integer = 1
     except ValueError:
       # value is not an integer
-      errors.update({table : {field : error_msg.format(value)}})
+      errors.update({table : {field : value_error_msg.format(value)}})
   elif 'enum' in datatype:
     tuple_str = datatype.replace('enum', '')
     enum = eval(tuple_str)
     if value not in enum:
       # value not in enum list
-      errors.update({table : {field : error_msg.format(value)}})
-  
-  # TODO enum check would be tables tests and statuses since they point to static information
+      errors.update({table : {field : value_error_msg.format(value)}})
+  elif table in DATATYPE_TABLES: 
+    # value is restricted based on the dynamic data in a table.
+    valid_entry = get_table(table, constraints=table_entry) 
+    if not valid_entry:
+      # no data matched the value provided in the given table
+      errors.update({table : {field : invalid_entry_msg.format(value)}})
 
+  if field == 'id':
+    # primary key 'id' needs to belong to an existing table row
+    valid_entry = get_table(table, constraints=table_entry)
+    if not valid_entry:
+      # no row found with provided 'id'
+      errors.update({table : {field : invalid_entry_msg.format(value)}})    
+  
   if errors:
     # throw bad request by default for value error
     abort(http_error_code, message=errors)
@@ -364,7 +384,6 @@ def validate_field_pointer(ref_table, ref_field, value, http_errro_code=404):
   if errors:
     abort(http_error_code, message=errors)
 
-  
 def get_field_datatype(table_name, field_name):
   """Fetch datatype of field."""
   table_info = execute_sql('DESCRIBE `{}`'.format(table_name))
@@ -375,68 +394,6 @@ def get_field_datatype(table_name, field_name):
       datatype = row_info['Type']
 
   return datatype
-
-  
-    
-          
-
-
-
-
-def ___________temp():  
-  # input validation
-  '''
-  table_name, hostname_status, retiredflag, tests_runs_staus_id, tests_runs_status, tests_name
-  '''
-  if table_name:
-    validate_table_name(table_name, http_error_code)
-
- # validation to check if data exisits in database
-  '''
-  hostname, hostname_id
-  '''
-
-  # zip contraint params to similar dictionary structure as db schema
-  params = zip_params(
-    hostname=hostname,
-    hostname_id=hostname_id,
-    hostname_status=hostname_status,
-    retiredflag=retiredflag,
-    tests_runs_status_id=tests_runs_status_id,
-    tests_runs_status_name=tests_runs_status,
-    tests_name=tests_name,
-  )
-
-  # individual paramter is invalid
-  field_error = 'Invalid field name or value \'{}\' not found.'
-  # combination of fields were not found together. Example: hostname with given retired flag. 
-  combo_error = 'Raw field combination {} with respective raw values {} not found.'
-
-  # iterate through scheme and check if same structure exists in params.
-  # edge case would have to handle with clustering table paramters
-  # this method of breaking for an incorrect value break when validating for insert? 
-
-  # TODO THIS ASSUMES A DATA EXISTS FOR VALID VALUES IN DATABASE!!!
-  for table in params:
-    # validate all paramters now structured as fields in tables
-    for field, value in params[table].items():
-      # validate individual fields
-      field_filter = {table : {field : value}}
-      table_content = get_table(table, constraints=field_filter)
-      if not table_content:
-        # no data found on {field : value} in databse
-        error_msg = {field : field_error.format(value)}
-        abort(http_error_code, message=error_msg)
-
-    # validate combination of fields in the same table
-    combo_filter = {table : params[table]}
-    valid_combo = get_table(table, constraints=combo_filter)
-    if not valid_combo:
-      # no row was found in table with combination of fields and values
-      field_list = params[table].keys()
-      value_list = params[table].values()
-      error_msg = {table : combo_error.format(field_list, value_list)}
-      abort(http_error_code, message=error_msg)
 
 def get_tests_runs_queue(constraints={}):
   """GET tests_runs_queue with optional constraint parameter - hostname."""
@@ -465,7 +422,6 @@ def append_sql_constraints(sql_command, constraints={}, authorized_tables=[]):
   Args:
       sql_command: mysql command string that *must* contain the WHERE clause.
   """
-
   if ' WHERE ' not in sql_command:
     # append dummy where clause
     sql_command = '{} WHERE TRUE'.format(sql_command)
@@ -552,9 +508,9 @@ def get_hostnames(hostname, retiredflag=None, hostname_status=None):
   )
   return hostnames
 
-def get_hostname_by_id(hostname_id):
+def get_hostname_by_id(hostnames_id):
   """Gets hostnames row by row id in hostnames table."""
-  hostname_row_list = get_table('hostnames', hostname_id=hostname_id)
+  hostname_row_list = get_table('hostnames', hostnames_id=hostnames_id)
 
   # there is only one hostname with the given unique id
   hostname_row = None
@@ -563,6 +519,20 @@ def get_hostname_by_id(hostname_id):
     hostname_row = hostname_row_list[0]
 
   return hostname_row
+
+def get_running_tests(hostname=None):
+  """Gets all tests_runs for a hostname that are currently running or queued."""
+  filter = get_empty_table('tests_runs')
+  if hostname is not None:
+    filter.update(zip_params(hostname=hostname))
+  # running tests have an undefined end time
+  filter['tests_runs'].update({
+      'end_timestamp' : NULL_TIMESTAMP
+  })
+
+  running_tests = get_table('tests_runs', constraints=filter)
+
+  return running_tests
 
 def validate_hostname(hostname, retiredflag=None, http_error_code=404):
   """Validates hostname's existence in the database
