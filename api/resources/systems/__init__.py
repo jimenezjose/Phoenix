@@ -11,8 +11,11 @@ class Systems(Resource):
     """GET request for all systems.
 
     Returns:
-        A list of systems (hostnames) in the database. Also,
-        Status Code 200 OK.
+        Dictionary of data in hostnames table.
+
+        Success:
+            Status Code: 200 OK
+                * hostnames table returned.
     """
     # query for all hostnames in the database
     hostnames_table = get_table('hostnames')

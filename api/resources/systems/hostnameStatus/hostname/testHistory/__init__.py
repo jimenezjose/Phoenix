@@ -1,7 +1,6 @@
 from api.db import (
     get_table,
     get_database_schema,
-    #get_duplicate_fields,
     zip_params,
     validate)
 
@@ -25,7 +24,7 @@ class TestHistory(Resource):
                 Status Code 404 Not Found
     """
     parser = reqparse.RequestParser()
-    validate(hostname_status=hostname_status, hostname=hostname)
+    validate(hostname_status=hostname_status, hostname=hostname, http_error_code=404)
 
     authorized_tables = ['hostnames', 'tests', 'tests_runs', 'statuses']
     filter = get_database_schema(authorized_tables)
