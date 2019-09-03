@@ -1,17 +1,16 @@
-# TODO delet by hostname id optional argument in delete request
 from .hostname import Hostname
 from api.db import (
-    validate,
-    get_table,
     delete_hostname,
-    insert_hostname,
     get_running_tests,
-    is_retired)
+    get_table,
+    insert_hostname,
+    is_retired,
+    validate)
 
 from flask_restful import (
+    abort,
     Resource, 
-    reqparse, 
-    abort)
+    reqparse)
 
 class HostnameStatus(Resource):
   """Statusflag that annotates a hostname system as 'retired' or 'active'."""
@@ -24,14 +23,16 @@ class HostnameStatus(Resource):
                          or 'retired' hostname.
     
     Returns:
+        Dictoinary of the hostnames table with a filtered hostname_status.
+
         Success:
-            * (valid status provided)
-                Status Code: 200 OK
+            Status Code: 200 OK
+                * valid hostname_status provided.
         Failure:
-            * (status provided unknown) - not {active, retired}
-                Status Code: 404 Not Found
+            Status Code: 404 Not Found 
+                * hostname_status provided unknown - not {active, retired} - invalid url.
     """
-    validate(hostname_status=hostname_status, htpp_error_code=404)
+    validate(hostname_status=hostname_status, http_error_code=404)
     # Get all hostnames with given retired hostname status
     hostnames_table = get_table('hostnames', hostname_status=hostname_status)
 
@@ -44,21 +45,19 @@ class HostnameStatus(Resource):
         hostname_status: string annotation of a system for a binary representation of an 'active' 
 
     Returns:
-        Inserted hostname info.
+        Dictionary of inserted hostname with keys coinciding column names of the table hostnames.
 
         Success: 
-            * (hostname inserted into the database)
-                Status Code: 201 Created
-
+            Status Code: 201 Created
+                * hostname inserted into the database.
         Failure: 
-            * (status provided does not exist)
-                Status Code: 404 Not Found
-            * (attempt to add a non-active hostname not allowed)
-                Status Code: 405 Method Not Allowed
-            * (required arguments not supplied in request)
-                Status Code: 404 Not Found
-            * (duplicate insertion for active hostname not allowed) 
-                Status Code: 409 Conflict
+            Status Code: 404 Not Found
+                * status provided does not exist.
+                * required arguments not supplied in request.
+            Status Code: 405 Method Not Allowed
+                * attempt to add a non-active hostname not allowed.
+            Status Code: 409 Conflict
+                * duplicate insertion for active hostname not allowed.
     """
     validate(hostname_status=hostname_status, htpp_error_code=404)
 
@@ -90,9 +89,22 @@ class HostnameStatus(Resource):
         hostname_status: string annotation of a system to show retired status. 
 
     Returns:
-        List of deleted hostnames. 
+        Dictionary of deleted hostname with keys coinciding the column names of table hostnames.
+
+        Success:
+            Status Code: 200 OK
+                * hostname deleted.
+        Failure: 
+            Status Code: 404 Not Found
+                * invalid url - hostname_status is not valid.
+                * no parameters were passed to the request.
+            Status Code: 405 Method Not Allowed
+                * attempt to do a DELETE request on invalid hostname_status in url
+            Status Code: 409 Conflict
+                * hostname did not exist in the database.
+                * hostname is marked as retired in the database.
+                * active hostname is busy with running tests.
     """
-    # TODO return change documentation in future
     validate(hostname_status=hostname_status, http_error_code=404)
 
     if is_retired(hostname_status):
@@ -112,13 +124,13 @@ class HostnameStatus(Resource):
           'hostnames_id' : 'Missing parameter in JSON body',
           'message' : 'At least one paramter is required',
       }
-      abort(400, message=errors)
+      abort(404, message=errors)
 
     # validate that hostname info exists in the db 
     validate(
         hostname=args['hostname'], 
         hostnames_id=args['hostnames_id'], 
-        http_error_code=400
+        http_error_code=409
     )
 
     # validate that the hostname is active 
@@ -135,19 +147,19 @@ class HostnameStatus(Resource):
       errors = {system_id : '\'{}\' must be active to be deleted.'.format(args[system_id])}
       abort(409, messages=errors)
 
-    # if hostname is running tests abort request
+    # if hostname is running tests - abort DELETE request
     running_tests = get_running_tests(hostname=args['hostname'], hostnames_id=args['hostnames_id'])
 
     if running_tests:
-      # system currently running tests - throw 400 Bad Request.
+      # system currently running tests - throw 409 Conflict
       error_msg = 'System is Busy. Currently processing {} tests.'.format(len(running_tests))
       errors = {args['hostname'] : error_msg}
-      abort(400, message=errors)
+      abort(409, message=errors)
 
     # internally hostnames_id takes precedence over hostname string
     hostnames_deleted = delete_hostname(hostnames_id=args['hostnames_id'], hostname=args['hostname'])
 
-    return {'hostnames' : hostnames_deleted}
+    return {'hostnames' : hostnames_deleted}, 200
 
   @staticmethod  
   def add_all_resources(api, path):

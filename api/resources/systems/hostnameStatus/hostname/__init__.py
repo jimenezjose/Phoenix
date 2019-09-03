@@ -1,7 +1,7 @@
 from .testHistory import TestHistory
 from api.db import (
-    validate,
-    get_table)
+    get_table,
+    validate)
 
 from flask_restful import Resource
 
@@ -16,15 +16,16 @@ class Hostname(Resource):
         hostname: string name of system hostname passed through url.
 
     Returns:
+        Hostname data as represented in the hostnames table.
+
         Success:
-            * (valid query for an existing hostname)
-                Status Code: 200 OK
+            Status Code: 200 OK
+                * return hostnames table entry.
         Failure:
-            * (unkown status priovided) - therefore incorrect url provided
-            * (hostname did not exist in the database)
-                Status Code: 404 Not Found
+            Status Code: 404 Not Found
+                * hostname does not exist or invalid hostname_status.
     """
-    validate(hostname=hostname, hostname_status=hostname_status)    
+    validate(hostname=hostname, hostname_status=hostname_status, http_error_code=404)    
     # query for hostname information
     hostnames_list = get_table('hostnames', hostname=hostname, hostname_status=hostname_status)
 

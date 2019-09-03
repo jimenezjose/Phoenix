@@ -1,11 +1,12 @@
 from api.db import (
-    get_table,
     get_database_schema,
-    #get_duplicate_fields,
-    zip_params,
-    validate)
+    get_table,
+    validate,
+    zip_params)
 
-from flask_restful import Resource, reqparse
+from flask_restful import (
+    Resource, 
+    reqparse)
 
 class TestHistory(Resource):
   """History resource to fetch all running tests, queued tests, and test history."""
@@ -17,29 +18,40 @@ class TestHistory(Resource):
         hostname: string name of system hostname passed through url.
 
     Returns:
+        Table dictionary of tests_runs with applied query paramters for filtering.
+
         Success:
-            * (tests_runs information on hostname found)
-                Status Code 200 OK
+            Status Code: 200 OK
+                * return tests runs information
         Failure:
-            * (invlaid hostname/statusflag provided)
-                Status Code 404 Not Found
+            Status Code: 404 Not Found
+                * Invalid url - invalid hostname_status or hostname
     """
     parser = reqparse.RequestParser()
-    validate(hostname_status=hostname_status, hostname=hostname)
+    validate(hostname_status=hostname_status, hostname=hostname, http_error_code=404)
 
     authorized_tables = ['hostnames', 'tests', 'tests_runs', 'statuses']
     filter = get_database_schema(authorized_tables)
+    duplicate_fields = set()
 
-    duplicate_fields = ['id', 'name']
+    # find duplicate field names
+    unique_field_set = set()
+    for table in filter:
+      for field in filter[table]:
+        if field in unique_field_set:
+          duplicate_fields.add(field)
+        else:
+          unique_field_set.add(field)
+
     # add query parameters 
     for table in filter:
       for field in filter[table]:
         if field in duplicate_fields:
-          # clarify field by prepending table name
+          # clarify field by prepending unique table name
           field = '{}_{}'.format(table, field)
         parser.add_argument(field, type=str, location='args')
     args = parser.parse_args()
- 
+
     # populate filter with query parameters
     for table in filter:
       for field in filter[table]:
@@ -60,7 +72,7 @@ class TestHistory(Resource):
     # query for filtered test-history
     tests_runs = get_table('tests_runs', constraints=filter)
 
-    return {'tests_runs' : tests_runs}
+    return {'tests_runs' : tests_runs}, 200
 
   @staticmethod  
   def add_all_resources(api, path):
