@@ -1,7 +1,7 @@
 from .testHistory import TestHistory
 from api.db import (
-    validate,
-    get_table)
+    get_table,
+    validate)
 
 from flask_restful import Resource
 

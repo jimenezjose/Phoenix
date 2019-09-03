@@ -1,16 +1,16 @@
 from .hostname import Hostname
 from api.db import (
-    validate,
-    get_table,
     delete_hostname,
-    insert_hostname,
     get_running_tests,
-    is_retired)
+    get_table,
+    insert_hostname,
+    is_retired,
+    validate)
 
 from flask_restful import (
+    abort,
     Resource, 
-    reqparse, 
-    abort)
+    reqparse)
 
 class HostnameStatus(Resource):
   """Statusflag that annotates a hostname system as 'retired' or 'active'."""
@@ -50,7 +50,6 @@ class HostnameStatus(Resource):
         Success: 
             Status Code: 201 Created
                 * hostname inserted into the database.
-
         Failure: 
             Status Code: 404 Not Found
                 * status provided does not exist.
@@ -95,7 +94,6 @@ class HostnameStatus(Resource):
         Success:
             Status Code: 200 OK
                 * hostname deleted.
-
         Failure: 
             Status Code: 404 Not Found
                 * invalid url - hostname_status is not valid.
@@ -149,11 +147,11 @@ class HostnameStatus(Resource):
       errors = {system_id : '\'{}\' must be active to be deleted.'.format(args[system_id])}
       abort(409, messages=errors)
 
-    # if hostname is running tests abort DELETE request
+    # if hostname is running tests - abort DELETE request
     running_tests = get_running_tests(hostname=args['hostname'], hostnames_id=args['hostnames_id'])
 
     if running_tests:
-      # system currently running tests - throw 400 Bad Request.
+      # system currently running tests - throw 409 Conflict
       error_msg = 'System is Busy. Currently processing {} tests.'.format(len(running_tests))
       errors = {args['hostname'] : error_msg}
       abort(409, message=errors)
