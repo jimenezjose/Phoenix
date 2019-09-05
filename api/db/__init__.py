@@ -7,6 +7,7 @@ from api.db.utils import (
     get_db,
     close_db)
 
+from datetime import datetime
 from flask_restful import abort
 
 # tests_runs constants
@@ -62,30 +63,39 @@ def execute_sql(command, db_commit=False, dictionary=True):
   if db_commit is True:
     db.commit()
     return cursor.lastrowid
+  
+  data = cursor.fetchall()
+  return json_serialize(data)
 
-  #table = json_serializable([{'hostname' : 'Jose'}])
-
-  return cursor.fetchall()
-
-def json_serializable(table):
+def json_serialize(data):
   """Ensures table_dict is JSON serializable for api requests.
   
   Args:
-      table: list of database dictionaries of the same table.
+      data: list of database dictionaries/tuples of the same table.
 
   Note:
-      This function mutates the original referenced dictionary.
+      This function mutates the original referenced list.
   """
+  for index, row in enumerate(data):
+    if isinstance(row, dict):
+      # case I: data is a list of dictionaries
+      for field, value in row.items():
+        if value is None:
+          continue
+        if isinstance(value, datetime):
+          data[index].update({field : str(value)})
 
-  for row in table:
-    for field, value in row.items():
-      if value is None:
-        continue
-      #elif get_field_datatype(table, field) == 'timestamp':
-        #row.update({field : str(value)})
+    elif isinstance(row, tuple):
+      # case II: data is a list of tuples
+      mutable_row = list(row)
+      for element_index, element in enumerate(row):
+        if element is None:
+          continue
+        if isinstance(element, datetime):
+          mutable_row[element_index] = str(element)
+      data[index] = tuple(mutable_row)
 
-  abort(404, message=table)
-
+  return data
 
 def insert_hostname(hostname):
   """Inserts hostname to database.
@@ -340,9 +350,6 @@ def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag
 
   # setup prefix notation for all pointers in the database
   database_table_list = ['{}_'.format(table) for table in get_database_table_list()]
-  #database_table_list = get_database_table_list()
-  #for index in range(len(database_table_list)):
-    #database_table_list[index] += '_'
 
   for table in params:
     for field, value in params[table].items():
