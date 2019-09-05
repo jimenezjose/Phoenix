@@ -30,6 +30,12 @@ STATUS_SCHEDULED = 7
 STATUS_STARTED = 8
 STATUS_QUEUED = 9
 
+# TODO remove dependency
+def validate_hostname(hostname=None):
+  return
+def validate_tests_name(tests=None):
+  return
+
 # STATIC DATATYPE TABLES
 DATATYPE_TABLES = ['statuses', 'tests', 'commands', 'hostnames']
 
@@ -57,7 +63,29 @@ def execute_sql(command, db_commit=False, dictionary=True):
     db.commit()
     return cursor.lastrowid
 
+  #table = json_serializable([{'hostname' : 'Jose'}])
+
   return cursor.fetchall()
+
+def json_serializable(table):
+  """Ensures table_dict is JSON serializable for api requests.
+  
+  Args:
+      table: list of database dictionaries of the same table.
+
+  Note:
+      This function mutates the original referenced dictionary.
+  """
+
+  for row in table:
+    for field, value in row.items():
+      if value is None:
+        continue
+      #elif get_field_datatype(table, field) == 'timestamp':
+        #row.update({field : str(value)})
+
+  abort(404, message=table)
+
 
 def insert_hostname(hostname):
   """Inserts hostname to database.
@@ -311,9 +339,10 @@ def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag
   )
 
   # setup prefix notation for all pointers in the database
-  database_table_list = get_database_table_list()
-  for index in range(len(database_table_list)):
-    database_table_list[index] += '_'
+  database_table_list = ['{}_'.format(table) for table in get_database_table_list()]
+  #database_table_list = get_database_table_list()
+  #for index in range(len(database_table_list)):
+    #database_table_list[index] += '_'
 
   for table in params:
     for field, value in params[table].items():
@@ -329,7 +358,7 @@ def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag
 
       for prefix in database_table_list:
         if prefix in field:
-          # example: hostnames_id -> ref_table = hostnames, ref_field = id
+          # example: field=hostnames_id -> prefix='hostnames_' -> {'hostnames', 'id'}.
           ref_table = prefix.replace('_', '')
           ref_field = field.replace(prefix, '')
           validate_field_pointer(ref_table, ref_field, value)
@@ -364,13 +393,6 @@ def validate_field_datatype(table, field, value, http_error_code=400):
       # no data matched the value provided in the given table
       errors.update({table : {field : invalid_entry_msg.format(value)}})
 
-  #if field == 'id':
-    # primary key 'id' needs to belong to an existing table row
-    #valid_entry = get_table(table, constraints=table_entry)
-    #if not valid_entry:
-      # no row found with provided 'id'
-      #errors.update({table : {field : invalid_entry_msg.format(value)}})    
-  
   if errors:
     # throw bad request by default for value error
     abort(http_error_code, message=errors)
@@ -426,9 +448,9 @@ def append_sql_constraints(sql_command, constraints={}, authorized_tables=[]):
   """appends sql conditions according to the constraints paramter.
 
   Args:
-      sql_command: mysql command string that *must* contain the WHERE clause.
+      sql_command: mysql command string that should contain the WHERE clause.
   """
-  if ' WHERE ' not in sql_command:
+  if 'WHERE' not in sql_command:
     # append dummy where clause
     sql_command = '{} WHERE TRUE'.format(sql_command)
 
@@ -443,6 +465,80 @@ def append_sql_constraints(sql_command, constraints={}, authorized_tables=[]):
 
   return sql_command
 
+def get_duplicate_field_names(table_list):
+  """Gets a list of duplicate field names found across table_list.
+
+  Args:
+      table_list: list of table names.
+
+  Returns:
+      List of dupicate field names found.
+  """
+  duplicate_fields = set()
+  unique_fields = set()
+
+  for table in table_list:
+    for field in get_table_fields(table):
+      if field in unique_fields:
+        # duplicate field found
+        duplicate_fields.add(field)
+      else:
+        unique_fields.add(field)
+
+  return list(duplicate_fields)
+  
+def testruns(constraints={}):
+  authorized_tables = ['hostnames', 'tests', 'tests_runs', 'statuses']
+  prefix_tables = ['{}_'.format(table) for table in authorized_tables]
+  duplicate_fields = get_duplicate_field_names(authorized_tables)
+
+  field_list = []
+  condition_list = []
+  for table in authorized_tables:
+    for field in get_table_fields(table):
+      # query for all fields associated with the authorized tables
+
+      # build aliases for duplicate field names - avoids dictionary key collision from mysql query
+      field_identifier = '{}.{}'.format(table, field)
+      if field in duplicate_fields:
+        # prepend string differentiater using the field's unique table name
+        unique_alias = '{}_{}'.format(table, field)
+        field_identifier = '{} AS {}'.format(field_identifier, unique_alias)
+      field_list.append(field_identifier)
+
+      # build join conditions for combining relational table information.
+      if '_' not in field:
+        # short circuit
+        continue
+      for prefix in prefix_tables:
+        if prefix in field:
+          # pointer found by naming convention - join relational pointers
+          ref_table = prefix.replace('_', '')
+          ref_field = field.replace(prefix, '')
+          condition = '{}.{} = {}.{}'.format(table, field, ref_table, ref_field)
+          condition_list.append(condition)
+          break
+          
+  # build select statment that specifies table fields to query
+  delimiter = ', '
+  union = ' AND ' 
+  select_fields = delimiter.join(field_list)
+  from_tables = delimiter.join(authorized_tables)  
+  join_conditions = union.join(condition_list)
+
+  sql_command = """
+      SELECT {}
+      FROM {}
+      WHERE {}
+  """.format(select_fields, from_tables, join_conditions)
+
+  # add filtering constraints to query
+  sql_command = append_sql_constraints(sql_command, constraints, authorized_tables)
+
+  tests_runs_table = execute_sql(sql_command)
+
+  return tests_runs_table
+
 def get_tests_runs_table(constraints={}):
   """Gets tests_runs_table with optional constraint paramters."""
   HOSTNAME_INDEX = 0
@@ -453,18 +549,21 @@ def get_tests_runs_table(constraints={}):
   NOTES_INDEX = 5
   CONFIG_INDEX = 6
   SCRATCH_INDEX = 7
-  ID_INDEX = 8
+  TESTS_RUNS_ID_INDEX = 8
+  HOSTNAMES_ID_INDEX = 9
 
   # query for all running tests
   sql_command = """
       SELECT hostnames.hostname, tests.name, statuses.name, tests_runs.start_timestamp, 
           tests_runs.end_timestamp, tests_runs.notes, tests_runs.config, tests_runs.scratch,
-          tests_runs.id
+          tests_runs.id, hostnames.id
       FROM hostnames, tests, tests_runs, statuses
       WHERE hostnames.id = tests_runs.hostnames_id 
       AND tests.id = tests_runs.tests_id
       AND statuses.id = tests_runs.statuses_id
   """
+  
+  return testruns(constraints)
 
   # append filter conditions
   authorized_tables = ['hostnames', 'tests', 'tests_runs', 'statuses']
@@ -497,12 +596,12 @@ def get_tests_runs_table(constraints={}):
         'notes' : data[NOTES_INDEX],
         'config' : data[CONFIG_INDEX],
         'scratch' : data[SCRATCH_INDEX],
-        'id' : data[ID_INDEX]
+        'tests_runs_id' : data[TESTS_RUNS_ID_INDEX],
+        'hostnames_id' : data[HOSTNAMES_ID_INDEX]
     })
 
   return tests_runs_table
 
-# TODO NO NEED FOR THIS FUNCTION IT IS THE SAME AS GET TABLE WITH GIVEN FILTER PARAMTERS
 def get_hostnames(hostname, retiredflag=None, hostname_status=None):
   """Gets hostname rows by hostname and with an optional retired status constraint."""
   # query for hostname
@@ -544,43 +643,6 @@ def get_running_tests(hostname=None, hostnames_id=None):
 
   return running_tests
 
-def validate_hostname(hostname, retiredflag=None, http_error_code=404):
-  """Validates hostname's existence in the database
-  
-  Args:
-      hostname: string that represents a unique system.
-      retiredflag: string that represents a system status.
-      http_error_code: status code returned if error is encountered.
-
-  Raises:
-      HTTPException: hostname does not exist in the database as statusflag, raise http_error_code 
-  """
-  hostname_status = 'both {} and {}'.format(HOSTNAME_STATUS_ACTIVE, HOSTNAME_STATUS_RETIRED)
-  errors = {}
-
-  sql_command = """
-      SELECT hostname FROM hostnames 
-      WHERE hostname = '{}' 
-  """.format(hostname)
-   
-  if retiredflag is not None:
-    # query hostnames with the retiredflag constraint
-    validate_retiredflag(retiredflag)
-    hostname_status = to_hostname_status(retiredflag)
-    sql_command = """
-        {} AND retired = '{}'
-    """.format(sql_command, retiredflag)
-
-  records = execute_sql(sql_command)
-
-  if not records:
-    # no existing hostname in the database
-    error_msg = '\'{}\' Not Found. Queried {} hostnames.'.format(hostname, hostname_status)
-    errors.update({'hostname' : error_msg})
-  
-  if errors:
-    abort(http_error_code, message=errors)
-
 def validate_hostname_status(hostname_status, http_error_code=404):
   """Validates hostname status to be 'active' or 'retired'.
   
@@ -596,92 +658,6 @@ def validate_hostname_status(hostname_status, http_error_code=404):
   if not is_active(hostname_status) and not is_retired(hostname_status):
     error_msg = '\'{}\' Not Found.'.format(hostname_status)
     errors.update({'hostname_status' : error_msg})
-
-  if errors:
-    abort(http_error_code, message=errors)
-
-def validate_retiredflag(retiredflag, http_error_code=404):
-  """Validates retiredflag is active '0' or 'retired '1'.
-  
-  Args:
-      retiredflag: binary representation of a hostnmame's status 
-      http_error_code: status code returned if error is encountered.
-
-  Raises:
-      HTTPException: retiredflag is not valid, raises http_error_code.
-  """
-  errors = {}
-
-  if not is_active(retiredflag) and not is_retired(retiredflag):
-    error_msg = '\'{}\' Not Found.'.format(retiredflag)
-    errors.update({'retiredflag' : error_msg})
-
-  if errors:
-    abort(http_error_code, message=errors)
-
-def validate_tests_name(tests_name, http_error_code=404):
-  """Validates tests.name existence in the database
-  
-  Args:
-      tests_name: unique stirng identifier of a system test.
-      http_error_code: status code returned if error is encountered.
-
-  Raises:
-      HTTPException: hostname does not exist in the database as statusflag, raise http_error_code 
-  """
-  errors = {}
-
-  records = execute_sql("""
-      SELECT * FROM tests 
-      WHERE tests.name = '{}'
-  """.format(tests_name))
-
-  if not records:
-    # no existing tests.name in the database
-    error_msg = '\'{}\' Not Found.'.format(tests_name)
-    errors.update({'tests_name' : error_msg}) 
-
-  if errors:
-    abort(http_error_code, message=errors)
-
-def validate_tests_runs_status(tests_runs_status, http_error_code=404):
-  """Validates tests_runs status existence in the database.
-  
-  Args:
-      tests_runs_status: representation of final outcome of a test run.
-      http_error_code: status code returned if error is encountered.
-
-  Raises:
-      HTTPException: hostname does not exist in the database as statusflag, raise http_error_code 
-  """
-  errors = {}
-
-  records = execute_sql("""
-      SELECT * FROM statuses
-      WHERE statuses.name = '{}'
-  """.format(tests_runs_status))
-
-  if not records:
-    # provided tests runs status does not exist
-    error_msg = '\'{}\' Not Found.'.format(tests_runs_status)
-    errors.update({'tests_runs_status' : '\'{}\' Not Found.'.format(tests_runs_status)})
-    
-  if errors:
-    abort(http_error_code, message=errors)
-
-def validate_tests_runs_status_by_id(tests_runs_status_id, http_error_code=404):
-  """Validates tests_runs_status id existence in the database."""
-  errors = {}
-
-  records = execute_sql("""
-      SELECT * FROM statuses
-      WHERE statuses.id = '{}'
-  """.format(tests_runs_status_id))
-
-  if not records:
-    # invalid status id provided
-    error_msg = '\'{}\' Not Found.'.format(tests_runs_status_id)
-    errors.update({'tests_runs_status_id', error_msg}) 
 
   if errors:
     abort(http_error_code, message=errors)

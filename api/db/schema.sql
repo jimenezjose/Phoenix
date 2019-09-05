@@ -68,7 +68,7 @@ CREATE TABLE `hostnames_facts_attributes` (
 CREATE TABLE `tests` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`name` varchar(255) NOT NULL UNIQUE,
-	`steps` varchar(255) NOT NULL,
+	`steps` varchar(255) DEFAULT NULL,
 	PRIMARY KEY (`id`)
 );
 
