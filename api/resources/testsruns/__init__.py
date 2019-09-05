@@ -3,6 +3,7 @@ from .testsrunsID import TestsrunsID
 from api.db import (
     execute_sql,
     NULL_TIMESTAMP,
+    json_serialize,
     get_running_tests,
     STATUS_RUNNING)
 
@@ -13,7 +14,7 @@ class Testsruns(Resource):
 
   def get(self):
     """GET request for all current running tests across all systems"""
-    
+
     running_tests = get_running_tests()
 
     return {'tests_runs' : running_tests}
