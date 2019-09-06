@@ -1,21 +1,14 @@
-from api.db import execute_sql
 from .details import Details
 from .testsID import TestsID
-
+from api.db import get_table
 from flask_restful import Resource
 
 class Tests(Resource):
   """Tests resource with class design inherited from flask_restful Resource."""
   def get(self):
     """GET request for all tests (id, name)."""
-
-    # query for all tests
-    records = execute_sql("""
-        SELECT id, name 
-        FROM tests
-    """)
-
-    return {'message': 'tests (id, name): {}'.format(records)}
+    tests_table = get_table('tests')
+    return {'tests' : tests_table}
 
   @staticmethod
   def add_all_resources(api, path):
