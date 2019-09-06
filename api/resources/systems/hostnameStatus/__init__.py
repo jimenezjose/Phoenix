@@ -59,7 +59,7 @@ class HostnameStatus(Resource):
             Status Code: 409 Conflict
                 * duplicate insertion for active hostname not allowed.
     """
-    validate(hostname_status=hostname_status, htpp_error_code=404)
+    validate(hostname_status=hostname_status, http_error_code=404)
 
     # require 'hostname' parameter from request. 
     parser = reqparse.RequestParser()
@@ -143,9 +143,9 @@ class HostnameStatus(Resource):
 
     if not active_hostname:
       # hostname is not active - validation check failed.
-      system_id = 'hostnames_id' if args['hostnames_id'] else 'hostname'
-      errors = {system_id : '\'{}\' must be active to be deleted.'.format(args[system_id])}
-      abort(409, messages=errors)
+      supplied_args = {key : value for key, value in args.items() if value is not None}
+      error_msg = 'No active hostname found with supplied args: {}'.format(supplied_args)
+      abort(409, message=error_msg)
 
     # if hostname is running tests - abort DELETE request
     running_tests = get_running_tests(hostname=args['hostname'], hostnames_id=args['hostnames_id'])

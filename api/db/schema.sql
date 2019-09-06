@@ -75,9 +75,7 @@ CREATE TABLE `tests` (
 /* added table to queue tests on currently running tests_runs on a busy server */
 CREATE TABLE `tests_runs_queue` (
         `id` INT NOT NULL AUTO_INCREMENT,
-        `test_runs_id` INT NOT NULL,
-        `test_id` INT NOT NULL,
-        `completed` ENUM('true', 'false') NOT NULL DEFAULT 'false',
+        `tests_runs_id` INT NOT NULL,
         PRIMARY KEY (`id`)
 );
 
@@ -102,7 +100,7 @@ CREATE TABLE `statuses` (
 
 CREATE TABLE `test_logs` (
 	`id` INT NOT NULL AUTO_INCREMENT,
-	`test_runs_id` INT NOT NULL,
+	`tests_runs_id` INT NOT NULL,
 	`files_id` blob NOT NULL,
 	`timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`)
@@ -110,7 +108,7 @@ CREATE TABLE `test_logs` (
 
 CREATE TABLE `commands_queue` (
 	`id` INT NOT NULL AUTO_INCREMENT,
-	`test_runs_id` INT NOT NULL,
+	`tests_runs_id` INT NOT NULL,
 	`commands_id` INT NOT NULL,
 	`completed` ENUM('true', 'false') NOT NULL DEFAULT 'false',
 	PRIMARY KEY (`id`)
@@ -163,11 +161,11 @@ ALTER TABLE `tests_runs` ADD CONSTRAINT `tests_runs_fk1` FOREIGN KEY (`tests_id`
 
 ALTER TABLE `tests_runs` ADD CONSTRAINT `tests_runs_fk2` FOREIGN KEY (`status`) REFERENCES `statuses`(`id`);
 
-ALTER TABLE `test_logs` ADD CONSTRAINT `test_logs_fk0` FOREIGN KEY (`test_runs_id`) REFERENCES `tests_runs`(`id`);
+ALTER TABLE `test_logs` ADD CONSTRAINT `test_logs_fk0` FOREIGN KEY (`tests_runs_id`) REFERENCES `tests_runs`(`id`);
 
 ALTER TABLE `test_logs` ADD CONSTRAINT `test_logs_fk1` FOREIGN KEY (`files_id`) REFERENCES `files`(`id`);
 
-ALTER TABLE `commands_queue` ADD CONSTRAINT `commands_queue_fk0` FOREIGN KEY (`test_runs_id`) REFERENCES `tests_runs`(`id`);
+ALTER TABLE `commands_queue` ADD CONSTRAINT `commands_queue_fk0` FOREIGN KEY (`tests_runs_id`) REFERENCES `tests_runs`(`id`);
 
 ALTER TABLE `commands_queue` ADD CONSTRAINT `commands_queue_fk1` FOREIGN KEY (`commands_id`) REFERENCES `commands`(`id`);
 

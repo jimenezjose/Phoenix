@@ -1,101 +1,15 @@
-# tests_runs status to status_id TODO
 # validate tests_runs_status
 # single valide function with optional params
 # look up by tests_name
 # validate arguments from JSON body given 400 error not 404. this is not a db problem rather and route handling prob.
-from api.db.utils import (
-    get_db,
-    close_db)
-
-from datetime import datetime
+from api.db.utils import *
 from flask_restful import abort
-
-# tests_runs constants
-NULL_TIMESTAMP = '0000-00-00 00:00:00'
-
-# retired flags
-HOSTNAME_RETIRED = 'true'
-HOSTNAME_ACTIVE  = 'false'
-# retired flag status name
-HOSTNAME_STATUS_ACTIVE = 'active'
-HOSTNAME_STATUS_RETIRED = 'retired'
-
-# statuses
-STATUS_PASSED = 1
-STATUS_FAILED = 2
-STATUS_COMPLETED = 3
-STATUS_INCOMPLETED = 4
-STATUS_RUNNING = 5
-STATUS_IN_SHELL = 6
-STATUS_SCHEDULED = 7
-STATUS_STARTED = 8
-STATUS_QUEUED = 9
 
 # TODO remove dependency
 def validate_hostname(hostname=None):
   return
 def validate_tests_name(tests=None):
   return
-
-# STATIC DATATYPE TABLES
-DATATYPE_TABLES = ['statuses', 'tests', 'commands', 'hostnames']
-
-def init_app(app):
-  """Binds the cloe_db function to be invoked upon app closure."""
-  app.teardown_appcontext(close_db)
-
-def execute_sql(command, db_commit=False, dictionary=True):
-  """Executes a single sql command on the database.
-  
-  Args:
-      command: mysql command.
-      db_commit: inserting data into the database. 
-
-  Returns:
-      if db_commit is True then return the last row id inserted into a db table.
-      otherwise return a list of dictionaries corresponding to the db table queried.
-  """
-  db = get_db()
-  cursor = db.cursor(dictionary=dictionary)
-
-  cursor.execute(command)
-
-  if db_commit is True:
-    db.commit()
-    return cursor.lastrowid
-  
-  data = cursor.fetchall()
-  return json_serialize(data)
-
-def json_serialize(data):
-  """Ensures table_dict is JSON serializable for api requests.
-  
-  Args:
-      data: list of database dictionaries/tuples of the same table.
-
-  Note:
-      This function mutates the original referenced list.
-  """
-  for index, row in enumerate(data):
-    if isinstance(row, dict):
-      # case I: data is a list of dictionaries
-      for field, value in row.items():
-        if value is None:
-          continue
-        if isinstance(value, datetime):
-          data[index].update({field : str(value)})
-
-    elif isinstance(row, tuple):
-      # case II: data is a list of tuples
-      mutable_row = list(row)
-      for element_index, element in enumerate(row):
-        if element is None:
-          continue
-        if isinstance(element, datetime):
-          mutable_row[element_index] = str(element)
-      data[index] = tuple(mutable_row)
-
-  return data
 
 def insert_hostname(hostname):
   """Inserts hostname to database.
@@ -161,7 +75,7 @@ def delete_hostname(hostname=None, hostnames_id=None):
   return deleted_rows
 
 def get_table(table_name, hostname=None, hostnames_id=None, hostname_status=None, retiredflag=None, 
-              tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None, 
+              statuses_id=None, statuses_name=None, tests_name=None, 
               constraints={}, raw=False):
   """Gets table content with optional constraint paramters.
   
@@ -181,8 +95,8 @@ def get_table(table_name, hostname=None, hostnames_id=None, hostname_status=None
     hostnames_id=hostnames_id,
     hostname_status=hostname_status,
     retiredflag=retiredflag,
-    tests_runs_status_id=tests_runs_status_id,
-    tests_runs_status_name=tests_runs_status_name,
+    statuses_id=statuses_id,
+    statuses_name=statuses_name,
     tests_name=tests_name,
   )
 
@@ -198,12 +112,10 @@ def get_table(table_name, hostname=None, hostnames_id=None, hostname_status=None
       if value is not None:
         filter[table].update({field : value})
 
-  if table_name is 'tests_runs' and not raw:
-    table = get_tests_runs_table(filter)
-  elif table_name is 'tests_runs_queue' and not raw:
-    table = get_tests_runs_queue(filter)
-  else:
+  if raw:
     table = get_raw_table(table_name, filter)
+  else:
+    table = get_detailed_table(table_name, filter)
 
   return table
 
@@ -223,18 +135,32 @@ def get_database_schema(table_restrictions=[]):
   """Structured dictionary that reflects the database schema."""
   if not table_restrictions:
     # no table restriction 
-    table_restrictions = get_database_table_list()
+    table_restrictions = get_database_tables()
 
   schema = {}
   # construct empty skeleton structure of database
-  for table_name in get_database_table_list():
+  for table_name in get_database_tables():
     if table_name in table_restrictions:
       table = get_empty_table(table_name)
       schema.update(table)
 
   return schema
 
-def get_empty_table(table_name):
+def get_empty_table(table_name, raw=False):
+  """Gets empty dictionary schema of table name."""
+  empty_table = []
+
+  # TODO
+  raw = True
+
+  if raw:
+    empty_table = _get_empty_raw_table(table_name)
+  else:
+    empty_table = _get_empty_detailed_table(table_name)
+
+  return empty_table
+
+def _get_empty_raw_table(table_name):
   """Gets dictionary of table with null key values."""
   empty_table = {table_name : {}}
 
@@ -242,6 +168,10 @@ def get_empty_table(table_name):
     empty_table[table_name].update({field : None})
    
   return empty_table
+
+def _get_empty_detailed_table(table_name):
+  return []
+
 
 def get_table_fields(table_name):
   """Gets a list of table field names."""
@@ -253,7 +183,7 @@ def get_table_fields(table_name):
 
   return table_fields
 
-def get_database_table_list():
+def get_database_tables():
   """Gets list of tables existent in database."""
   records = execute_sql('SHOW TABLES', dictionary=False)
 
@@ -265,7 +195,7 @@ def get_database_table_list():
   return table_names_list
 
 def zip_params(hostname=None, hostname_status=None, retiredflag=None,
-              tests_runs_status_id=None, tests_runs_status_name=None, tests_name=None, 
+              statuses_id=None, statuses_name=None, tests_name=None, 
               hostnames_id=None):
   """Encapsulates common api paramters to database schema dictionary.
   Example:
@@ -299,13 +229,13 @@ def zip_params(hostname=None, hostname_status=None, retiredflag=None,
   # populate tests_runs table 
   params['tests_runs'].update({
       'hostnames_id': hostnames_id,
-      'statuses_id' : tests_runs_status_id,
+      'statuses_id' : statuses_id,
   })
 
   # populate statuses table
   params['statuses'].update({
-      'id' : tests_runs_status_id,
-      'name' : tests_runs_status_name
+      'id' : statuses_id,
+      'name' : statuses_name
   })
 
   # populate tests table
@@ -323,13 +253,10 @@ def zip_params(hostname=None, hostname_status=None, retiredflag=None,
 
   return params
 
-# TODO CHANGE TESTS_RUNS_STATUS TO TESTS_RUNS_STATUS_NAME
 def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag=None, 
-             tests_name=None, tests_runs_status=None, tests_runs_status_id=None, 
+             tests_name=None, statuses_name=None, statuses_id=None, 
              table_name=None, http_error_code=404):
-  """Database check of system variable integrity. 
-  """ 
-
+  """Database check of system variable integrity."""
   if table_name is not None:
     # check if table exists in database
     validate_table_name(table_name, http_error_code)
@@ -343,13 +270,10 @@ def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag
     hostnames_id=hostnames_id,
     hostname_status=hostname_status,
     retiredflag=retiredflag,
-    tests_runs_status_id=tests_runs_status_id,
-    tests_runs_status_name=tests_runs_status,
+    statuses_id=statuses_id,
+    statuses_name=statuses_name,
     tests_name=tests_name,
   )
-
-  # setup prefix notation for all pointers in the database
-  database_table_list = ['{}_'.format(table) for table in get_database_table_list()]
 
   for table in params:
     for field, value in params[table].items():
@@ -363,13 +287,12 @@ def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag
         # field is not a pointer by naming convention 
         continue
 
-      for prefix in database_table_list:
-        if prefix in field:
-          # example: field=hostnames_id -> prefix='hostnames_' -> {'hostnames', 'id'}.
-          ref_table = prefix.replace('_', '')
-          ref_field = field.replace(prefix, '')
-          validate_field_pointer(ref_table, ref_field, value)
-          break
+      pointer_data = parse_field_pointer(field)
+      if pointer_data is not None:
+        # example: field=hostnames_id -> ref_table='hostnames', ref_field='id'
+        ref_table = pointer_data[0]
+        ref_field = pointer_data[1]
+        validate_field_pointer(ref_table, ref_field, value)
 
 def validate_field_datatype(table, field, value, http_error_code=400):
   """Type checking for enums, integers and strings."""
@@ -404,7 +327,7 @@ def validate_field_datatype(table, field, value, http_error_code=400):
     # throw bad request by default for value error
     abort(http_error_code, message=errors)
 
-def validate_field_pointer(ref_table, ref_field, value, http_errro_code=404):
+def validate_field_pointer(ref_table, ref_field, value, http_error_code=404):
   """Field points to an invalid row of a table."""
   table_entry = {ref_table : {ref_field : value}}
   pointer_data = get_table(ref_table, constraints=table_entry)
@@ -414,7 +337,7 @@ def validate_field_pointer(ref_table, ref_field, value, http_errro_code=404):
 
   if not pointer_data:
     pointer_field = '{}_{}'.format(ref_table, ref_field)
-    errros.update({pointer_field : error_msg.format(value)})
+    errors.update({pointer_field : error_msg.format(value)})
 
   if errors:
     abort(http_error_code, message=errors)
@@ -432,15 +355,9 @@ def get_field_datatype(table_name, field_name):
 
 def get_tests_runs_queue(constraints={}):
   """GET tests_runs_queue with optional constraint parameter - hostname."""
+  # TODO DEPRICATED
+  return ['depricated']
   # query for all tests runs in the queue
-  sql_command =  """
-      SELECT hostnames.hostname 
-      FROM hostnames, tests_runs, tests_runs_queue
-      WHERE hostnames.id = tests_runs.hostnames_id
-      AND tests_runs.id = tests_runs_queue.test_runs_id
-      AND tests_runs.statuses_id = '{}'
-      AND hostnames.retired = '{}'
-  """.format(STATUS_QUEUED, HOSTNAME_ACTIVE)
 
   # restrict query on constraints
   authorized_tables = ['hostnames', 'tests_runs', 'tests_runs_queue']
@@ -493,10 +410,47 @@ def get_duplicate_field_names(table_list):
         unique_fields.add(field)
 
   return list(duplicate_fields)
+
+def parse_field_pointer(field_name):
+  """Parses a field pointer into describing the table and field it points to.
+
+  Returns:
+      A tuple of referenced table and field resepectively if the field is 
+      a pointer. Otherwise None will be returned.
+  """
+  prefix_tables = ['{}_'.format(table) for table in get_database_tables()]
+  # sort prefix table in descending string length to avoid ambiguous parse for case 'tests_runs_id'
+  prefix_tables.sort(key=len, reverse=True)
   
-def testruns(constraints={}):
-  authorized_tables = ['hostnames', 'tests', 'tests_runs', 'statuses']
-  prefix_tables = ['{}_'.format(table) for table in authorized_tables]
+  if '_' not in field_name:
+    # field is not a pointer by naming convention
+    return None
+
+  for prefix in prefix_tables:
+    if prefix in field_name:
+      ref_table = prefix[:-1]
+      ref_field = field_name.replace(prefix, '')
+      return (ref_table, ref_field)
+
+  return None
+
+def get_linked_tables(table_name):
+  """Gets all tables assosiated with the fields in table_name."""
+  prefix_tables = ['{}_'.format(table) for table in get_database_tables()]
+  linked_tables = set([table_name])
+
+  for field in get_table_fields(table_name):
+    pointer_data = parse_field_pointer(field)
+    if pointer_data is not None:
+      # recurse to fetch interlinked tables
+      table = pointer_data[0]
+      interlinked_tables = get_linked_tables(table)
+      linked_tables |= set(interlinked_tables)
+
+  return list(linked_tables)
+
+def get_detailed_table(table_name, constraints={}):
+  authorized_tables = get_linked_tables(table_name)
   duplicate_fields = get_duplicate_field_names(authorized_tables)
 
   field_list = []
@@ -514,24 +468,20 @@ def testruns(constraints={}):
       field_list.append(field_identifier)
 
       # build join conditions for combining relational table information.
-      if '_' not in field:
-        # short circuit
-        continue
-      for prefix in prefix_tables:
-        if prefix in field:
-          # pointer found by naming convention - join relational pointers
-          ref_table = prefix.replace('_', '')
-          ref_field = field.replace(prefix, '')
-          condition = '{}.{} = {}.{}'.format(table, field, ref_table, ref_field)
-          condition_list.append(condition)
-          break
-          
+      pointer_data = parse_field_pointer(field)
+      if pointer_data is not None:
+        # field is referencing data on different table
+        ref_table = pointer_data[0]
+        ref_field = pointer_data[1]
+        condition = '{}.{} = {}.{}'.format(table, field, ref_table, ref_field)
+        condition_list.append(condition)
+        
   # build select statment that specifies table fields to query
   delimiter = ', '
   union = ' AND ' 
   select_fields = delimiter.join(field_list)
   from_tables = delimiter.join(authorized_tables)  
-  join_conditions = union.join(condition_list)
+  join_conditions = union.join(condition_list) if condition_list else 'TRUE'
 
   sql_command = """
       SELECT {}
@@ -541,72 +491,7 @@ def testruns(constraints={}):
 
   # add filtering constraints to query
   sql_command = append_sql_constraints(sql_command, constraints, authorized_tables)
-
   tests_runs_table = execute_sql(sql_command)
-
-  return tests_runs_table
-
-def get_tests_runs_table(constraints={}):
-  """Gets tests_runs_table with optional constraint paramters."""
-  HOSTNAME_INDEX = 0
-  TESTS_NAME_INDEX = 1
-  STATUSES_INDEX = 2
-  START_TIMESTAMP_INDEX = 3
-  END_TIMESTAMP_INDEX = 4
-  NOTES_INDEX = 5
-  CONFIG_INDEX = 6
-  SCRATCH_INDEX = 7
-  TESTS_RUNS_ID_INDEX = 8
-  HOSTNAMES_ID_INDEX = 9
-
-  # query for all running tests
-  sql_command = """
-      SELECT hostnames.hostname, tests.name, statuses.name, tests_runs.start_timestamp, 
-          tests_runs.end_timestamp, tests_runs.notes, tests_runs.config, tests_runs.scratch,
-          tests_runs.id, hostnames.id
-      FROM hostnames, tests, tests_runs, statuses
-      WHERE hostnames.id = tests_runs.hostnames_id 
-      AND tests.id = tests_runs.tests_id
-      AND statuses.id = tests_runs.statuses_id
-  """
-  
-  return testruns(constraints)
-
-  # append filter conditions
-  authorized_tables = ['hostnames', 'tests', 'tests_runs', 'statuses']
-  sql_command = append_sql_constraints(sql_command, constraints, authorized_tables)
-
-  # get raw data (reason: key naming collision with tests.name and statuses.name)
-  records = execute_sql(sql_command, dictionary=False)
-
-  if not records:
-    # no running tests
-    return []
-
-  tests_runs_table = []
-  for data in records:
-    # datetime.datetime is not json serializable
-    start_timestamp = str(data[START_TIMESTAMP_INDEX])
-    end_timestamp = str(data[END_TIMESTAMP_INDEX])
-    # follow consistency in representation of null objects
-    if data[START_TIMESTAMP_INDEX] is None:
-      start_timestamp = None
-    if data[END_TIMESTAMP_INDEX] is None:
-      end_timestamp = None
-  
-    tests_runs_table.append({
-        'hostname' : data[HOSTNAME_INDEX],
-        'tests_name' : data[TESTS_NAME_INDEX],
-        'statuses_name' : data[STATUSES_INDEX],
-        'start_timestamp' : start_timestamp,
-        'end_timestamp' : end_timestamp,
-        'notes' : data[NOTES_INDEX],
-        'config' : data[CONFIG_INDEX],
-        'scratch' : data[SCRATCH_INDEX],
-        'tests_runs_id' : data[TESTS_RUNS_ID_INDEX],
-        'hostnames_id' : data[HOSTNAMES_ID_INDEX]
-    })
-
   return tests_runs_table
 
 def get_hostnames(hostname, retiredflag=None, hostname_status=None):
@@ -684,30 +569,4 @@ def validate_table_name(table_name, htpp_error_code=404):
 
   if errors:
     abort(http_error_code, message=errors)
-
-def is_retired(flag):
-  return flag == HOSTNAME_RETIRED or flag == HOSTNAME_STATUS_RETIRED
-
-def is_active(flag):
-  return flag == HOSTNAME_ACTIVE or flag == HOSTNAME_STATUS_ACTIVE
-
-def to_retiredflag(hostname_status):
-  """Convers hostnames_status to an equivalent retiredflag string"""
-  if is_retired(hostname_status):
-    return HOSTNAME_RETIRED
-  elif is_active(hostname_status):
-    return HOSTNAME_ACTIVE
-
-  # error, return uncoverted string
-  return hostname_status
-
-def to_hostname_status(retiredflag):
-  """Converts retiredflag to a hostname status strings {'active', 'retired'}"""
-  if is_retired(retiredflag):
-    return HOSTNAME_STATUS_RETIRED
-  elif is_active(retiredflag):
-    return HOSTNAME_STATUS_ACTIVE
-
-  # error, return uncoverted string
-  return retiredflag
 

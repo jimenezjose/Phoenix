@@ -1,11 +1,6 @@
 from .start import Start
 from .testsrunsID import TestsrunsID
-from api.db import (
-    execute_sql,
-    NULL_TIMESTAMP,
-    json_serialize,
-    get_running_tests,
-    STATUS_RUNNING)
+from api.db import get_running_tests
 
 from flask_restful import Resource
 
@@ -14,9 +9,7 @@ class Testsruns(Resource):
 
   def get(self):
     """GET request for all current running tests across all systems"""
-
     running_tests = get_running_tests()
-
     return {'tests_runs' : running_tests}
 
   @staticmethod
