@@ -1,7 +1,12 @@
+/* NOTE to allow 0 timestamp: use the following */
+/*SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';*/
+/*SET SQL_MODE='ALLOW_INVALID_DATES';*/
+/* url: https://stackoverflow.com/questions/9192027/invalid-default-value-for-create-date-timestamp-field */
+
 CREATE TABLE `hostnames` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`hostname` varchar(255) NOT NULL,
-	`retired` INT(1) NOT NULL DEFAULT '0',
+	`retired` ENUM('true', 'false') NOT NULL DEFAULT 'false',
 	PRIMARY KEY (`id`)
 );
 
@@ -63,16 +68,14 @@ CREATE TABLE `hostnames_facts_attributes` (
 CREATE TABLE `tests` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`name` varchar(255) NOT NULL UNIQUE,
-	`steps` varchar(255) NOT NULL,
+	`steps` varchar(255) DEFAULT NULL,
 	PRIMARY KEY (`id`)
 );
 
 /* added table to queue tests on currently running tests_runs on a busy server */
 CREATE TABLE `tests_runs_queue` (
         `id` INT NOT NULL AUTO_INCREMENT,
-        `test_runs_id` INT NOT NULL,
-        `test_id` INT NOT NULL,
-        `completed` BOOLEAN NOT NULL DEFAULT '0',
+        `tests_runs_id` INT NOT NULL,
         PRIMARY KEY (`id`)
 );
 
@@ -80,9 +83,9 @@ CREATE TABLE `tests_runs` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`hostnames_id` INT NOT NULL,
 	`tests_id` INT NOT NULL,
-	`start_timestamp` TIMESTAMP NOT NULL,
-	`end_timestamp` TIMESTAMP NOT NULL,
-	`status` INT NOT NULL,
+	`start_timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	`end_timestamp` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00',
+	`statuses_id` INT NOT NULL,
 	`notes` TEXT,
 	`config` TEXT,
 	`scratch` TEXT,
@@ -97,17 +100,17 @@ CREATE TABLE `statuses` (
 
 CREATE TABLE `test_logs` (
 	`id` INT NOT NULL AUTO_INCREMENT,
-	`test_runs_id` INT NOT NULL,
+	`tests_runs_id` INT NOT NULL,
 	`files_id` blob NOT NULL,
-	`timestamp` TIMESTAMP NOT NULL,
+	`timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`)
 );
 
 CREATE TABLE `commands_queue` (
 	`id` INT NOT NULL AUTO_INCREMENT,
-	`test_runs_id` INT NOT NULL,
+	`tests_runs_id` INT NOT NULL,
 	`commands_id` INT NOT NULL,
-	`completed` BOOLEAN NOT NULL DEFAULT '0',
+	`completed` ENUM('true', 'false') NOT NULL DEFAULT 'false',
 	PRIMARY KEY (`id`)
 );
 
@@ -158,11 +161,11 @@ ALTER TABLE `tests_runs` ADD CONSTRAINT `tests_runs_fk1` FOREIGN KEY (`tests_id`
 
 ALTER TABLE `tests_runs` ADD CONSTRAINT `tests_runs_fk2` FOREIGN KEY (`status`) REFERENCES `statuses`(`id`);
 
-ALTER TABLE `test_logs` ADD CONSTRAINT `test_logs_fk0` FOREIGN KEY (`test_runs_id`) REFERENCES `tests_runs`(`id`);
+ALTER TABLE `test_logs` ADD CONSTRAINT `test_logs_fk0` FOREIGN KEY (`tests_runs_id`) REFERENCES `tests_runs`(`id`);
 
 ALTER TABLE `test_logs` ADD CONSTRAINT `test_logs_fk1` FOREIGN KEY (`files_id`) REFERENCES `files`(`id`);
 
-ALTER TABLE `commands_queue` ADD CONSTRAINT `commands_queue_fk0` FOREIGN KEY (`test_runs_id`) REFERENCES `tests_runs`(`id`);
+ALTER TABLE `commands_queue` ADD CONSTRAINT `commands_queue_fk0` FOREIGN KEY (`tests_runs_id`) REFERENCES `tests_runs`(`id`);
 
 ALTER TABLE `commands_queue` ADD CONSTRAINT `commands_queue_fk1` FOREIGN KEY (`commands_id`) REFERENCES `commands`(`id`);
 
