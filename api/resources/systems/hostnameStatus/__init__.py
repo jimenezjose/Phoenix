@@ -82,6 +82,8 @@ class HostnameStatus(Resource):
 
     return inserted_hostname
 
+
+# take off hostname id for simplicity of function definition TODO
   def delete(self, hostname_status):
     """DELETE the hostname by setting the retired flag to True.
 
@@ -97,7 +99,8 @@ class HostnameStatus(Resource):
         Failure: 
             Status Code: 404 Not Found
                 * invalid url - hostname_status is not valid.
-                * no parameters were passed to the request.
+            Status Code: 400  Bad Request
+                * no parameters were passed in the JSON body to the request.
             Status Code: 405 Method Not Allowed
                 * attempt to do a DELETE request on invalid hostname_status in url
             Status Code: 409 Conflict
@@ -124,7 +127,7 @@ class HostnameStatus(Resource):
           'hostnames_id' : 'Missing parameter in JSON body',
           'message' : 'At least one paramter is required',
       }
-      abort(404, message=errors)
+      abort(400, message=errors)
 
     # validate that hostname info exists in the db 
     validate(

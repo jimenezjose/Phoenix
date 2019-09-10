@@ -2,6 +2,7 @@
 # single valide function with optional params
 # look up by tests_name
 # validate arguments from JSON body given 400 error not 404. this is not a db problem rather and route handling prob.
+# TODO Depricate get hostname by id and use get data by id
 from api.db.utils import *
 from flask_restful import abort
 
@@ -10,6 +11,47 @@ def validate_hostname(hostname=None):
   return
 def validate_tests_name(tests=None):
   return
+
+def get_data_by_id(table_name, table_id):
+  data = execute_sql("""
+      SELECT * FROM `{0}` 
+      WHERE {0}.id = '{1}'
+  """.format(table_name, table_id)) 
+
+  if not data:
+    return None
+  
+  return data[0]
+
+def insert_tests_run(hostname, tests_name, statuses_id):
+  """Insert a new tests run to the database."""
+  hostnames_data = get_table('hostnames', hostname=hostname, retiredflag=HOSTNAME_ACTIVE)
+  tests_data = get_table('tests', tests_name=tests_name)
+
+  errors = {}
+  if not hostnames_data:
+    error_msg = 'hostname \'{}\' Not Found.'.format(hostname)
+    errors.update({'hostnames' : error_msg})
+  elif not tests_data:
+    error_msg = 'test \'{}\' Not Found.'.format(tests_name)
+    errors.update({'tests' : error_msg})
+  if errors:
+    # intrnal server error - invalid hostname or testsname
+    abort(500, message=errors)
+
+  # active hostname and tests name is guaranteed to be unique
+  hostnames_id = hostnames_data[0]['id']
+  tests_id = tests_data[0]['id']
+
+  rowid = execute_sql("""
+      INSERT INTO tests_runs
+      (hostnames_id, tests_id, statuses_id) VALUES('{}', '{}', '{}')
+  """.format(hostnames_id, tests_id, statuses_id), db_commit=True)
+  
+  inserted_row = get_data_by_id('tests_runs', rowid)
+  
+  return inserted_row
+
 
 def insert_hostname(hostname):
   """Inserts hostname to database.
@@ -73,6 +115,71 @@ def delete_hostname(hostname=None, hostnames_id=None):
   execute_sql(sql_command, db_commit=True)
 
   return deleted_rows
+
+
+
+
+def add_filter_query_parameters(parser, table_name):
+  """Adds filtering query paramters based from table name.
+
+  Args:
+      parser: reqparse object from RequestParser
+      table_name: name of table interested to be filtered.
+  """
+  authorized_tables = get_linked_tables(table_name)
+  filter = get_database_schema(authorized_tables)
+  duplicate_fields = get_duplicate_field_names(authorized_tables)
+
+  # add query parameters 
+  for table in filter:
+    for field in filter[table]:
+      if field in duplicate_fields:
+        # clarify field by prepending unique table name
+        field = '{}_{}'.format(table, field)
+      parser.add_argument(field, type=str, location='args')
+
+def parse_filter_query_parameters(args, table_name):
+  """Parse query parameters from args and set up paramters in their database layout.
+
+  Args: 
+      args: parsed query string from reqparse parser function parse_args() 
+      table_name: name of table in interest to be filtered with query params.
+
+  Example:
+      args = {'hostnames_id' : 1, 'tests_name' : 'bios_up_down'}
+      Returns:
+          {
+            {'hostnames' : {'id' : 1}}
+            {'tests' : {'name' : 'bios_up_down'}}
+          }
+
+  Raises:
+      HTTPException: InternalServerError
+          HTTP status code : 500
+          * Invalid supplied 'args' supplied to function call.
+
+  Returns:
+      Dictionary of database constraints based from query parameters. Readily to be used as the 
+      constraints paramters to get_table().
+  """
+  authorized_tables = get_linked_tables(table_name)
+  constraints = get_database_schema(authorized_tables)
+  duplicate_fields = get_duplicate_field_names(authorized_tables)
+
+  # populate constriants with query parameters
+  for table in constraints:
+    for field in constraints[table]:
+      index = field
+      if field in duplicate_fields:
+        # clarify unique field index in args
+        index = '{}_{}'.format(table, field)
+      if index not in args:
+        # undefined index for incorrectly formatted args
+        abort(500, message={table_name: 'Error. Query paramters cannot be parsed.'})
+      value = args[index]
+      constraints[table].update({field : value})
+
+  return constraints
 
 def get_table(table_name, hostname=None, hostnames_id=None, hostname_status=None, retiredflag=None, 
               statuses_id=None, statuses_name=None, tests_name=None, 
@@ -171,7 +278,6 @@ def _get_empty_raw_table(table_name):
 
 def _get_empty_detailed_table(table_name):
   return []
-
 
 def get_table_fields(table_name):
   """Gets a list of table field names."""
@@ -517,9 +623,12 @@ def get_hostname_by_id(hostnames_id):
 
   return hostname_row
 
-def get_running_tests(hostname=None, hostnames_id=None):
+def get_running_tests(hostname=None, hostnames_id=None, constraints={}):
   """Gets all tests_runs for a hostname that are currently running or queued."""
   filter = get_empty_table('tests_runs')
+
+  if constraints:
+    filter.update(constraints)
 
   if hostnames_id is not None:
     filter.update(zip_params(hostnames_id=hostnames_id))
