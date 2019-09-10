@@ -1,15 +1,27 @@
 from .start import Start
 from .testsrunsID import TestsrunsID
-from api.db import get_running_tests
+from api.db import (
+    add_filter_query_parameters,
+    parse_filter_query_parameters,
+    get_running_tests)
 
-from flask_restful import Resource
+from flask_restful import (
+    Resource, 
+    reqparse)
 
 class Testsruns(Resource):
   """Testruns resource with class design inherited from flask_restful Resource."""
 
   def get(self):
     """GET request for all current running tests across all systems"""
-    running_tests = get_running_tests()
+    parser = reqparse.RequestParser()
+
+    add_filter_query_parameters(parser, 'tests_runs')
+    args = parser.parse_args()
+    filter = parse_filter_query_parameters(args, 'tests_runs')
+
+    running_tests = get_running_tests(constraints=filter)
+
     return {'tests_runs' : running_tests}
 
   @staticmethod
