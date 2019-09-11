@@ -1,5 +1,5 @@
 from .start import Start
-from .testsrunsID import TestsrunsID
+from .id import TestsrunsID
 from api.db import (
     add_filter_query_parameters,
     parse_filter_query_parameters,
@@ -22,7 +22,7 @@ class Testsruns(Resource):
 
     running_tests = get_running_tests(constraints=filter)
 
-    return {'tests_runs' : running_tests}
+    return {'tests_runs' : running_tests}, 200
 
   @staticmethod
   def add_all_resources(api, path):

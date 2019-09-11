@@ -117,7 +117,7 @@ CREATE TABLE `commands_queue` (
 CREATE TABLE `commands` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`name` varchar(255) NOT NULL UNIQUE,
-	`command` varchar(255),
+	`command` varchar(255) NOT NULL,
 	PRIMARY KEY (`id`)
 );
 

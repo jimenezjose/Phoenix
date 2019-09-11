@@ -19,7 +19,7 @@ class Details(Resource):
     filter = parse_filter_query_parameters(args, 'tests_runs')
 
     tests_commands_table = get_table('tests_commands', constraints=filter)
-    return {'tests_commands' : tests_commands_table}
+    return {'tests_commands' : tests_commands_table}, 200
 
   @staticmethod
   def add_all_resources(api, path):

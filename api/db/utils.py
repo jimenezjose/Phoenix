@@ -118,7 +118,7 @@ def to_retiredflag(hostname_status):
   elif is_active(hostname_status):
     return HOSTNAME_ACTIVE
 
-  # error, return uncoverted string
+  # error, return unconverted string
   return hostname_status
 
 def to_hostname_status(retiredflag):
@@ -128,5 +128,5 @@ def to_hostname_status(retiredflag):
   elif is_active(retiredflag):
     return HOSTNAME_STATUS_ACTIVE
 
-  # error, return uncoverted string
+  # error, return unconverted string
   return retiredflag

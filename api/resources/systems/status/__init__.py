@@ -63,7 +63,7 @@ class HostnameStatus(Resource):
 
     # require 'hostname' parameter from request. 
     parser = reqparse.RequestParser()
-    parser.add_argument('hostname', required=True)
+    parser.add_argument('hostname', type=str, required=True)
     args = parser.parse_args()
 
     if is_retired(hostname_status):

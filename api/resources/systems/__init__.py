@@ -1,4 +1,4 @@
-from .hostnameStatus import HostnameStatus
+from .status import HostnameStatus
 from api.db import get_table
 from flask_restful import (
     Resource, 

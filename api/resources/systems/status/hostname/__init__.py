@@ -1,4 +1,4 @@
-from .testHistory import TestHistory
+from .history import TestHistory
 from api.db import (
     get_table,
     validate)
