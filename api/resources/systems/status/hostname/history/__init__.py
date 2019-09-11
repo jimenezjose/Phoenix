@@ -57,3 +57,4 @@ class TestHistory(Resource):
     """
     # register tests as an api resource with the given path
     api.add_resource(TestHistory, path)
+    # directly add sub-resources of 'test-history' <HERE>
