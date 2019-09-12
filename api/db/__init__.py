@@ -204,20 +204,19 @@ def get_running_tests(hostname=None, hostnames_id=None, constraints={}):
   running_tests = get_table('tests_runs', constraints=filter)
   return running_tests
 
-def get_data_by_id(table_name, row_id):
+def get_data_by_id(table_name, row_id, raw=False):
   """Gets table row data by row id.
 
   Returns:
     Dictionary of row data from 'table_name'
   """
-  table_data = execute_sql("""
-      SELECT * FROM `{0}` 
-      WHERE {0}.id = '{1}'
-  """.format(table_name, row_id)) 
+  table_id = {table_name : {'id' : row_id}}
+  table_data = get_table(table_name, constraints=table_id, raw=raw)
 
   row = None
   if table_data:
     row = table_data[0]
+
   return row
 
 def get_table_fields(table_name):

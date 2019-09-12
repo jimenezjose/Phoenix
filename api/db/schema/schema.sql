@@ -98,10 +98,10 @@ CREATE TABLE `statuses` (
 	PRIMARY KEY (`id`)
 );
 
-CREATE TABLE `test_logs` (
+CREATE TABLE `tests_logs` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`tests_runs_id` INT NOT NULL,
-	`files_id` blob NOT NULL,
+	`fileblob` BLOB NOT NULL,
 	`timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`)
 );

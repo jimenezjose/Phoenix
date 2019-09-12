@@ -36,4 +36,4 @@ class Testsruns(Resource):
     api.add_resource(Testsruns, path)
     # directly add sub-resources of testruns
     Start.add_all_resources(api, '{}/start'.format(path))
-    TestsrunsID.add_all_resources(api, '{}/<int:id>'.format(path))
+    TestsrunsID.add_all_resources(api, '{}/<int:tests_runs_id>'.format(path))
