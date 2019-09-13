@@ -1,5 +1,10 @@
+import os
+import uuid
 from api.db.utils import *
 from flask_restful import abort
+from werkzeug import (
+    FileStorage,
+    secure_filename)
 
 def add_filter_query_parameters(parser, table_name):
   """Adds filtering query paramters based from table name.
@@ -65,7 +70,7 @@ def parse_filter_query_parameters(args, table_name):
 
 def get_table(table_name, hostname=None, hostnames_id=None, hostname_status=None, retiredflag=None, 
               statuses_id=None, statuses_name=None, tests_name=None, tests_id=None, tests_runs_id=None,
-              notes=None, config=None, scratch=None, constraints={}, raw=False):
+              notes=None, config=None, scratch=None, tests_logs_id=None, constraints={}, raw=False):
   """Gets table content with optional constraint paramters.
   
   Args:
@@ -92,6 +97,7 @@ def get_table(table_name, hostname=None, hostnames_id=None, hostname_status=None
     notes=notes,
     config=config,
     scratch=scratch,
+    tests_logs_id=tests_logs_id,
   )
 
   # merge constraints to filter
@@ -326,6 +332,33 @@ def parse_field_pointer(field_name):
 
   return None
 
+def insert_tests_log(tests_runs_id, a_file):
+  """Inserts tests log into the tests_logs table in db."""
+  # insert file to disk and database
+  files_id = insert_file(a_file)
+
+  table_name = 'tests_logs'
+  tests_logs_id = execute_sql("""
+      INSERT INTO `{}`
+      (tests_runs_id, files_id) VALUES ('{}', '{}')
+  """.format(table_name, tests_runs_id, files_id), db_commit=True)
+
+  return tests_logs_id
+
+def insert_file(a_file):
+  """Inserts file to database and disk."""
+  file_location = save_file_to_disk(a_file)
+  file_name = a_file.filename
+
+  table_name = 'files'
+  files_id = execute_sql("""
+      INSERT INTO `{}`
+      (name, location) VALUES ('{}', '{}')
+  """.format(table_name, file_name, file_location), db_commit=True)
+
+  return files_id
+
+
 def insert_tests_run(hostname, tests_name, statuses_id):
   """Insert a new tests run to the database."""
   hostnames_data = get_table('hostnames', hostname=hostname, retiredflag=HOSTNAME_ACTIVE)
@@ -416,6 +449,59 @@ def update(table_name, rowid, values):
   updated_row = get_data_by_id(table_name, rowid)
   return updated_row
 
+def save_file_to_disk(a_file):
+  """Write file to disk."""
+  if not isinstance(a_file, FileStorage):
+    # Assumption of a_file type
+    raise TypeError("storage must be a werkzeug.FileStorage")
+  # sanitize file name
+  a_file_name = secure_filename(a_file.filename)
+  a_unique_name = secure_filename(str(uuid.uuid4()))
+  a_file_location = os.path.join('/tmp/', a_unique_name)
+  # save file to disk
+  if os.path.exists(a_file_location):
+    abort(500, message='Unique id collision. Try again.')
+  # write file to disk
+  a_file.save(a_file_location)
+  return a_file_location
+
+def delete_file_from_disk(filepath):
+  """Remove file from disk."""
+  if os.path.exists(filepath):
+    os.remove(filepath)
+
+def delete_file(files_id):
+  """Deletes file from disk and database."""
+  table_name = 'files'
+  files_row = get_data_by_id(table_name, files_id)
+  if not files_row:
+    # file id does not exist
+    return None
+  # remove file from disk
+  delete_file_from_disk(files_row['location'])
+  # delete file name and location from database
+  execute_sql("""
+      DELETE FROM `{}`
+      WHERE id = '{}'
+  """.format(table_name, files_row['id']), db_commit=True)
+  return files_row
+
+def delete_tests_log(tests_logs_id):
+  """Deletes tests log file from disk and profile from database."""
+  table_name = 'tests_logs'
+  tests_log = get_data_by_id(table_name, tests_logs_id)
+  if not tests_log:
+    # id does not exists 
+    return None
+  # delete file from db and disk
+  delete_file(tests_log['files_id'])
+  # delete tests log from db
+  execute_sql("""
+      DELETE FROM `{}`
+      WHERE id = '{}'
+  """.format(table_name, tests_logs_id), db_commit=True)
+  return tests_log
+
 def delete_hostname(hostname=None, hostnames_id=None):
   """Deletes hostnames by setting hostname.retired to true.
 
@@ -471,7 +557,8 @@ def delete_hostname(hostname=None, hostnames_id=None):
 
 def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag=None, 
              tests_name=None, statuses_name=None, statuses_id=None, tests_runs_id=None,
-             table_name=None, notes=None, config=None, scratch=None, data={}, http_error_code=404):
+             table_name=None, notes=None, config=None, scratch=None, tests_logs_id=None,
+             data={}, http_error_code=404):
   """Database check of system variable integrity."""
 
   # check if table exists in database
@@ -493,7 +580,8 @@ def validate(hostname=None, hostname_status=None, hostnames_id=None, retiredflag
     statuses_id=statuses_id,
     statuses_name=statuses_name,
     tests_name=tests_name,
-    tests_runs_id=tests_runs_id
+    tests_runs_id=tests_runs_id,
+    tests_logs_id=tests_logs_id,
   )
 
   schema = get_database_schema()
@@ -631,7 +719,7 @@ def validate_hostname_status(hostname_status, http_error_code=404):
 
 def zip_params(hostname=None, hostnames_id=None, hostname_status=None, retiredflag=None, 
                statuses_id=None, statuses_name=None, tests_name=None, tests_id=None, 
-               tests_runs_id=None, notes=None, config=None, scratch=None):
+               tests_runs_id=None, notes=None, config=None, scratch=None, tests_logs_id=None):
   """Encapsulates common api paramters to database schema dictionary.
   Example:
      `hostnames` table:
@@ -652,7 +740,7 @@ def zip_params(hostname=None, hostnames_id=None, hostname_status=None, retiredfl
     retiredflag = to_retiredflag(hostname_status)
 
   # empty schema structure of database
-  params = get_database_schema(['hostnames', 'tests_runs', 'statuses', 'tests'])
+  params = get_database_schema()
 
   # populate hostnames table
   params['hostnames'].update({
@@ -682,6 +770,11 @@ def zip_params(hostname=None, hostnames_id=None, hostname_status=None, retiredfl
   params['tests'].update({
       'id' : tests_id,
       'name' : tests_name,
+  })
+
+  params['tests_logs'].update({
+      'id' : tests_logs_id,
+      'tests_runs_id' : tests_runs_id,
   })
 
   # remove null data

@@ -1,4 +1,4 @@
-from .log import TestsrunsLog
+from .logs import TestsrunsLogs
 from .update import TestsrunsUpdate
 from api.db import (
     get_table, 
@@ -39,5 +39,5 @@ class TestsrunsID(Resource):
     # register testruns 'TestrunsID' as an api resource
     api.add_resource(TestsrunsID, path)
     # directly add sub-resources of testruns 'TestrunsID'
-    TestsrunsLog.add_all_resources(api, '{}/log'.format(path))
+    TestsrunsLogs.add_all_resources(api, '{}/logs'.format(path))
     TestsrunsUpdate.add_all_resources(api, '{}/update'.format(path))
