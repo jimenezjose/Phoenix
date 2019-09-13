@@ -1,0 +1,169 @@
+{
+  "sfo2-aar-17-sr1.perf.twttr.net": {
+    "attributes": {
+      "access_group": {
+        "datacenter": "hardware-eng-team", 
+        "role": "nessus.scanner"
+      }, 
+      "bmc_macaddress": {
+        "server": "00:1e:67:c2:cd:0f"
+      }, 
+      "bmc_switch_port_map": {
+        "server": "ge-0/0/16"
+      }, 
+      "boot_file": {
+        "base_platform": "pxelinux.0.gpxe"
+      }, 
+      "burnin_cpu": {
+        "server": "COMPLETED"
+      }, 
+      "burnin_disk": {
+        "server": "COMPLETED"
+      }, 
+      "burnin_ram": {
+        "server": "COMPLETED"
+      }, 
+      "ciss_osrev": {
+        "server": "6.7"
+      }, 
+      "disk_layout": {
+        "server": "mysql_raid10_lvm_xfs"
+      }, 
+      "eth0_switch_port_map": {
+        "server": "ge-0/0/16"
+      }, 
+      "eth1_switch_port_map": {
+        "server": "ge-0/1/16"
+      }, 
+      "host_verification": {
+        "server": "1455844278.55"
+      }, 
+      "hoststate_boottime_epoch_seconds": {
+        "server": "1536711658"
+      }, 
+      "hoststate_boottime_rfc3339": {
+        "server": "2018-09-12T00:20:58+00:00"
+      }, 
+      "hoststate_cpu_count": {
+        "server": "24"
+      }, 
+      "hoststate_kickstart_epoch_seconds": {
+        "server": "1535490754"
+      }, 
+      "hoststate_kickstart_rfc3339": {
+        "server": "2018-08-28T21:12:34+00:00"
+      }, 
+      "hoststate_memory_mb": {
+        "server": "64158.57"
+      }, 
+      "hoststate_network_speed_int": {
+        "server": "1000"
+      }, 
+      "hoststate_release_distro": {
+        "server": "7.5.1804"
+      }, 
+      "hoststate_release_kernel": {
+        "server": "4.9.78-t9.el7.twitter.x86_64"
+      }, 
+      "hoststate_serial_board": {
+        "server": "QSGR43402047"
+      }, 
+      "hoststate_serial_machine": {
+        "server": "B8100A01002244500001J0SA"
+      }, 
+      "hoststate_version_bios": {
+        "server": "SE5C600.86B.02.03.2004.030620151456"
+      }, 
+      "hoststate_version_bios_release_date": {
+        "server": "03/06/2015"
+      }, 
+      "hoststate_version_bmcfirmware": {
+        "server": "Excluded Platform or OS: CISS-4463, OS-4281, CISS-6727"
+      }, 
+      "kdump_enable": {
+        "datacenter": "false"
+      }, 
+      "ldap_sync_blocked": {
+        "server": "false"
+      }, 
+      "observe.vex.systemv2": {
+        "datacenter": "true"
+      }, 
+      "os_version": {
+        "datacenter": "centos-7", 
+        "role": "centos-7"
+      }, 
+      "owner_group": {
+        "datacenter": "hardware-eng-team,ciss-team", 
+        "role": "hardware-eng-team"
+      }, 
+      "provision_stage": {
+        "server": "puppet_complete"
+      }, 
+      "reinstall_by": {
+        "server": "msilver"
+      }, 
+      "serial_console_tty": {
+        "base_platform": "ttyS1"
+      }, 
+      "service.racklimit": {
+        "role": "1000"
+      }, 
+      "sflab_assigned": {
+        "server": "jeffryw"
+      }, 
+      "sku_signature": {
+        "platform": "2xIntel.R.Xeon.R.CPUE5-2630v2_M64_N2_S3700/3800_D0", 
+        "server": "2xIntel.R.Xeon.R.CPUE5-2630v2_M64_N2_S2200_D0"
+      }, 
+      "ssh_dsa_fingerprint": {
+        "server": "7510159cafa3645e033462b5488b2b29bfd08af2"
+      }, 
+      "ssh_rsa_fingerprint": {
+        "server": "07afd1e28aa179a14238932ffe685449b4db46c4\n85ab6631d69f3f7919d9f2855a201eb244a4ae1ea50ab7624e02f7ca74dfbbc6"
+      }, 
+      "unmonitored": {
+        "server": "999999999"
+      }, 
+      "verify_sku_end": {
+        "server": "1455839559.56"
+      }, 
+      "verify_sku_start": {
+        "server": "1455839556.6"
+      }, 
+      "wilson_disk_initialization": {
+        "server": "COMPLETED"
+      }, 
+      "wilson_error": {
+        "server": "1535489619"
+      }, 
+      "wilson_lifecycle_state": {
+        "server": "allocated"
+      }, 
+      "wilson_verify_sku": {
+        "server": "COMPLETED"
+      }, 
+      "yes_i_know_what_im_doing": {
+        "server": "true"
+      }
+    }, 
+    "facts": {
+      "bmc_address": {
+        "server": "172.24.237.116"
+      }, 
+      "hostname": {
+        "server": "sfo2-aar-17-sr1.perf.twttr.net"
+      }, 
+      "ipaddress_prod": {
+        "server": "172.24.236.116"
+      }
+    }, 
+    "groups": {
+      "base_platform": "lyra", 
+      "datacenter": "sfo2", 
+      "platform": "lyra/ahmv", 
+      "rack": "aar", 
+      "role": "hwlab.shared"
+    }
+  }
+}

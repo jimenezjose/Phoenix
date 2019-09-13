@@ -1,0 +1,6 @@
+loony:wilson_stage
+loony:validation_status
+loony:validation_loop
+loony:TLT
+ipmi:power cycle
+ipmi:power reset
