@@ -10,6 +10,7 @@ from flask_restful import (
     reqparse)
 
 class TestsrunsUpdate(Resource):
+  """Update testsrun paramaters such as status, config, and notes."""
 
   def put(self, tests_runs_id):
     """Updates testsruns table row data.

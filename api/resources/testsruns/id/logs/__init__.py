@@ -1,4 +1,3 @@
-# NOTE for file upload to work :
 # KEY 'file' type file 
 # VALUE <file> 
 # CONTENT TYPE application/octet-stream or multipart/form-data
@@ -19,7 +18,7 @@ from flask_restful import (
     request)
 
 class TestsrunsLogs(Resource):
-  """testsruns/<int:id>/logs resource to upload new logs for a testsrun."""
+  """Upload/Delete log files to testsruns. Also get log file ids."""
 
   def get(self, tests_runs_id):
     """GET request for tests_logs_ids that contain the fileblobs associated with testsruns_id""" 

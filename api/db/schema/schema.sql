@@ -3,6 +3,9 @@
 /*SET SQL_MODE='ALLOW_INVALID_DATES';*/
 /* url: https://stackoverflow.com/questions/9192027/invalid-default-value-for-create-date-timestamp-field */
 
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
+SET SQL_MODE='ALLOW_INVALID_DATES';
+
 CREATE TABLE `hostnames` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`hostname` varchar(255) NOT NULL,
@@ -159,11 +162,11 @@ ALTER TABLE `tests_runs` ADD CONSTRAINT `tests_runs_fk0` FOREIGN KEY (`hostnames
 
 ALTER TABLE `tests_runs` ADD CONSTRAINT `tests_runs_fk1` FOREIGN KEY (`tests_id`) REFERENCES `tests`(`id`);
 
-ALTER TABLE `tests_runs` ADD CONSTRAINT `tests_runs_fk2` FOREIGN KEY (`status`) REFERENCES `statuses`(`id`);
+ALTER TABLE `tests_runs` ADD CONSTRAINT `tests_runs_fk2` FOREIGN KEY (`statuses_id`) REFERENCES `statuses`(`id`);
 
-ALTER TABLE `test_logs` ADD CONSTRAINT `test_logs_fk0` FOREIGN KEY (`tests_runs_id`) REFERENCES `tests_runs`(`id`);
+ALTER TABLE `tests_logs` ADD CONSTRAINT `tests_logs_fk0` FOREIGN KEY (`tests_runs_id`) REFERENCES `tests_runs`(`id`);
 
-ALTER TABLE `test_logs` ADD CONSTRAINT `test_logs_fk1` FOREIGN KEY (`files_id`) REFERENCES `files`(`id`);
+ALTER TABLE `tests_logs` ADD CONSTRAINT `tests_logs_fk1` FOREIGN KEY (`files_id`) REFERENCES `files`(`id`);
 
 ALTER TABLE `commands_queue` ADD CONSTRAINT `commands_queue_fk0` FOREIGN KEY (`tests_runs_id`) REFERENCES `tests_runs`(`id`);
 
