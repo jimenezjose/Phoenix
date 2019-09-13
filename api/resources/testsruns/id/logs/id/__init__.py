@@ -1,4 +1,6 @@
-from api.db import get_data_by_id, validate
+from api.db import (
+    get_data_by_id, 
+    validate)
 from flask import send_from_directory
 from flask_restful import (
     abort,
@@ -6,9 +8,10 @@ from flask_restful import (
     reqparse)
 
 class TestslogsID(Resource):
+  """Download test log file."""
 
   def get(self, tests_runs_id, tests_logs_id):
-    """Gets binary data of tests log"""
+    """Download test log file."""
     validate(tests_runs_id=tests_runs_id, tests_logs_id=tests_logs_id)
     tests_log = get_data_by_id('tests_logs', tests_logs_id)
 
@@ -23,7 +26,6 @@ class TestslogsID(Resource):
     uuid_filename = filepath.split('/')[-1]
     # path to folder that hold the log file in disk
     upload_folder = filepath.replace(uuid_filename, '')
-
     # user friendly name of test log
     friendly_filename = tests_log['files_name']
     
@@ -33,7 +35,6 @@ class TestslogsID(Resource):
         as_attachment=True,
         attachment_filename=friendly_filename
     )
-
     return file_attachment
 
   @staticmethod

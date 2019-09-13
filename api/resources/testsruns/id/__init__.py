@@ -7,7 +7,7 @@ from api.db import (
 from flask_restful import Resource
 
 class TestsrunsID(Resource):
-  """testsruns/<int:id> resource to get all info about a testsrun."""
+  """Retrieves id specific testsrun data."""
 
   def get(self, tests_runs_id):
     """GET request for (hostname, tests name, start time, end time, notes, config, scratch)
