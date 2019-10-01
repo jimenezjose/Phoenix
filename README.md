@@ -19,7 +19,7 @@ $ python run.py
 ```
 
 MySQL Database Schema:
-
+![Alt Text](https://github.com/jimenezjose/Phoenix/blob/master/docs/images/Twitter%20LabTester%20API%20Schema.png)
 
 Internal Twitter Documentation. VPN required. 
 [go/labtesterAPI](https://confluence.twitter.biz/pages/viewpage.action?pageId=107089361)
