@@ -18,11 +18,27 @@ $ pip install -r requirements.txt
 $ python run.py
 ```
 
-MySQL Database Schema:
+#### MySQL Database Schema:
 ![Alt Text](https://github.com/jimenezjose/Phoenix/blob/master/docs/images/Twitter%20LabTester%20API%20Schema.png)
 
-Slide Presentation of my intern project.
-![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/Labtester.pdf)
+#### [Slide Presentation](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/Labtester.pdf) of my intern project.
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-1.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-2.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-3.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-4.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-5.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-6.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-7.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-8.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-9.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-10.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-11.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-12.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-13.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-14.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-15.pdf)
+![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-16.pdf)
+
 
 Internal Twitter Documentation. VPN required. 
 [go/labtesterAPI](https://confluence.twitter.biz/pages/viewpage.action?pageId=107089361)
