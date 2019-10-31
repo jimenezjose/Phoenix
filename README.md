@@ -1,6 +1,6 @@
 ## Twitter Lab Tester API (Project Phoenix) 
 
-Twitter SF HQ Internal API for the Hardware Engineering Team. 
+Twitter SF HQ Internal REST API for the Hardware Engineering Team. 
 Automating Hardware qualification by holding:
 * hardware/firmware tests
 * commands associated per test
