@@ -21,7 +21,7 @@ $ python run.py
 #### MySQL Database Schema:
 ![Alt Text](https://github.com/jimenezjose/Phoenix/blob/master/docs/images/Twitter%20LabTester%20API%20Schema.png)
 
-#### [Slide Presentation](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/Labtester.pdf) of my intern project.
+#### Slide Presentation of my intern project.
 ![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-1.png)
 ![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-2.png)
 ![Alt Text](https://github.com/jimenezjose/Twitter-Lab-Tester-Api/blob/master/docs/files/slides/Labtester-3.png)
